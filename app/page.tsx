@@ -1,22 +1,81 @@
 import Image from "next/image";
 
 const navItems = [
-  "Home",
-  "About Us",
-  "Our Services",
-  "Properties",
-  "Blog",
-  "Careers",
-  "Contact Us"
+  { label: "Home" },
+  { label: "About Us" },
+  {
+    label: "Our Services",
+    dropdown: ["Sales", "Property Management", "Relocation Management"]
+  },
+  {
+    label: "Properties",
+    dropdown: ["Rent", "Sale"]
+  },
+  { label: "Blog" },
+  { label: "Careers" },
+  { label: "Contact Us" }
 ];
 
 const searchFilters = [
-  "Looking for",
-  "Location",
-  "Price Range",
-  "Property Type",
-  "Bedrooms"
-];
+  {
+    label: "Looking for",
+    type: "checkbox-list",
+    panelAlign: "left",
+    footerLabel: "Property Filter",
+    options: [
+      "Select All",
+      "Apartment",
+      "House",
+      "Land",
+      "Office",
+      "Retail",
+      "Townhouse",
+      "Warehouse"
+    ]
+  },
+  {
+    label: "Location",
+    type: "checkbox-list",
+    panelAlign: "left",
+    footerLabel: "Location Filter",
+    options: [
+      "Select All",
+      "Abelemkpe",
+      "Aburi",
+      "Achimota",
+      "Adjiringanor",
+      "Airport Hills",
+      "Airport Residential",
+      "Asylum Down",
+      "Cantonments",
+      "Dzorwulu",
+      "East Airport",
+      "East Legon"
+    ]
+  },
+  {
+    label: "Price Range",
+    type: "price-range",
+    panelAlign: "left",
+    footerLabel: "Price Filter",
+    minPrice: "GHC 1",
+    maxPrice: "GHC 100M+"
+  },
+  {
+    label: "Property Type",
+    type: "checkbox-list",
+    panelAlign: "right",
+    footerLabel: "Property Filter",
+    options: ["Select All", "For Sale", "For Rent"]
+  },
+  {
+    label: "Bedrooms",
+    type: "checkbox-list",
+    panelAlign: "right",
+    footerLabel: "Bedroom Filter",
+    options: ["Select All", "1 Bedroom", "2 Bedrooms", "3 Bedrooms", "4 Bedrooms", "5+ Bedrooms"]
+  }
+] as const;
 
 const serviceCards = [
   {
@@ -156,23 +215,34 @@ export default function Home() {
           <div className="logo-card">
             <Image
               src="/IMG_8557.JPG"
-              alt="Akka Kappa"
+              alt="Fairhaven"
               width={220}
               height={220}
               className="logo-image"
               priority
             />
-            <p className="logo-wordmark">akka kappa</p>
           </div>
 
           <nav className="main-nav" aria-label="Primary navigation">
             {navItems.map((item) => (
-              <a href="#" key={item} className="main-nav-link">
-                {item}
-                {(item === "Our Services" || item === "Properties") && (
-                  <span className="nav-caret">⌄</span>
+              <div
+                key={item.label}
+                className={item.dropdown ? "nav-item nav-item-dropdown" : "nav-item"}
+              >
+                <a href="#" className="main-nav-link">
+                  {item.label}
+                  {item.dropdown && <span className="nav-caret">⌄</span>}
+                </a>
+                {item.dropdown && (
+                  <div className="nav-dropdown" role="menu" aria-label={item.label}>
+                    {item.dropdown.map((option) => (
+                      <a href="#" key={option} className="nav-dropdown-link" role="menuitem">
+                        {option}
+                      </a>
+                    ))}
+                  </div>
                 )}
-              </a>
+              </div>
             ))}
           </nav>
         </header>
@@ -183,11 +253,7 @@ export default function Home() {
           </button>
 
           <div className="hero-copy">
-            <h1>
-              Welcome To
-              <br />
-              Akka Kappa
-            </h1>
+            <h1>Fairhaven</h1>
             <span className="hero-divider" />
             <p>Ghana&apos;s Real Estate Experts!</p>
           </div>
@@ -213,10 +279,60 @@ export default function Home() {
 
           <div className="filters-row">
             {searchFilters.map((filter) => (
-              <button key={filter} type="button" className="filter-chip">
-                <span>{filter}</span>
-                <span className="chip-caret">⌄</span>
-              </button>
+              <details
+                key={filter.label}
+                className={`filter-dropdown ${filter.type === "price-range" ? "filter-dropdown-price" : ""} ${
+                  filter.panelAlign === "right" ? "filter-dropdown-right" : ""
+                }`}
+              >
+                <summary className="filter-chip">
+                  <span>{filter.label}</span>
+                  <span className="chip-caret">⌄</span>
+                </summary>
+
+                <div className="filter-panel">
+                  {filter.type === "price-range" ? (
+                    <div className="price-panel">
+                      <div className="price-inputs">
+                        <label className="price-field">
+                          <span>Min Price</span>
+                          <div>{filter.minPrice}</div>
+                        </label>
+                        <label className="price-field">
+                          <span>Max Price</span>
+                          <div>{filter.maxPrice}</div>
+                        </label>
+                      </div>
+
+                      <div className="range-visual" aria-hidden="true">
+                        <span className="range-track" />
+                        <span className="range-thumb range-thumb-left" />
+                        <span className="range-thumb range-thumb-right" />
+                        <div className="range-labels">
+                          <span>{filter.minPrice}</span>
+                          <span>{filter.maxPrice}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="filter-options">
+                      {filter.options.map((option) => (
+                        <label key={option} className="filter-option">
+                          <input type="checkbox" />
+                          <span>{option}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="filter-panel-footer">
+                    <span>{filter.footerLabel}</span>
+                    <button type="button" className="filter-reset">
+                      Reset
+                    </button>
+                  </div>
+                </div>
+              </details>
             ))}
           </div>
         </div>
@@ -403,9 +519,17 @@ export default function Home() {
         </div>
       </footer>
 
-      <div className="floating-buttons" aria-hidden="true">
-        <div className="floating-button floating-button-dark">✦</div>
-        <div className="floating-button floating-button-green">◔</div>
+      <div className="floating-buttons">
+        <a href="#" className="floating-button floating-button-whatsapp" aria-label="WhatsApp">
+          <svg
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            className="floating-button-icon"
+            fill="currentColor"
+          >
+            <path d="M19.05 4.94A9.9 9.9 0 0 0 12.03 2C6.56 2 2.1 6.45 2.1 11.92c0 1.75.46 3.46 1.33 4.97L2 22l5.26-1.38a9.9 9.9 0 0 0 4.76 1.21h.01c5.47 0 9.93-4.45 9.93-9.92a9.83 9.83 0 0 0-2.91-6.97Zm-7.02 15.22h-.01a8.3 8.3 0 0 1-4.23-1.16l-.3-.18-3.12.82.84-3.04-.2-.31a8.23 8.23 0 0 1-1.27-4.37c0-4.56 3.72-8.28 8.3-8.28 2.21 0 4.29.86 5.86 2.42a8.2 8.2 0 0 1 2.43 5.86c0 4.57-3.72 8.29-8.3 8.29Zm4.54-6.2c-.25-.13-1.47-.72-1.7-.8-.23-.08-.4-.13-.57.13-.17.25-.66.8-.81.97-.15.17-.3.19-.55.06-.25-.13-1.06-.39-2.01-1.23-.74-.66-1.24-1.47-1.39-1.72-.15-.25-.02-.38.11-.51.11-.11.25-.3.38-.44.13-.15.17-.25.25-.42.08-.17.04-.32-.02-.44-.06-.13-.57-1.36-.78-1.86-.21-.5-.42-.42-.57-.43h-.49c-.17 0-.44.06-.67.32-.23.25-.88.86-.88 2.1s.9 2.44 1.02 2.61c.13.17 1.77 2.71 4.29 3.8.6.26 1.07.42 1.43.54.6.19 1.15.16 1.58.1.48-.07 1.47-.6 1.68-1.18.21-.59.21-1.09.15-1.18-.06-.1-.23-.15-.48-.27Z" />
+          </svg>
+        </a>
       </div>
     </main>
   );

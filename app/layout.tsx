@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Akka Kappa Properties",
+  title: "Fairhaven Properties",
   description: "Premium real estate UI built with Next.js 15."
 };
 
