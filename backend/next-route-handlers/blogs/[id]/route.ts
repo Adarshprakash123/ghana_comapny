@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import type { BlogPost } from "../../../data";
+import type { BlogPost } from "../../../../frontend/app/data";
 import { type BlogPayload, readBlogs, slugify, writeBlogs } from "../blog-store";
 
 export const runtime = "nodejs";

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import type { PropertyListing } from "../../../data";
+import type { PropertyListing } from "../../../../frontend/app/data";
 import { type PropertyPayload, readProperties, writeProperties } from "../property-store";
 
 export const runtime = "nodejs";
@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
   const params = await context.params;
   const id = params.id;
-  
+
   if (!id) {
     return NextResponse.json({ error: "Property ID is required" }, { status: 400 });
   }
@@ -35,7 +35,10 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     city: payload.city?.trim() ?? properties[index].city,
     location: payload.location?.trim() ?? properties[index].location,
     type: payload.type?.trim() ?? properties[index].type,
-    status: payload.status === "For Rent" || payload.status === "For Sale" ? payload.status : properties[index].status,
+    status:
+      payload.status === "For Rent" || payload.status === "For Sale"
+        ? payload.status
+        : properties[index].status,
     meta: payload.meta?.trim() ?? properties[index].meta,
     description: payload.description?.trim() ?? properties[index].description,
     price: payload.price?.trim() ?? properties[index].price,
@@ -61,7 +64,7 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
 
   let properties = await readProperties();
   const initialLength = properties.length;
-  
+
   properties = properties.filter((p) => p.id !== id);
 
   if (properties.length === initialLength) {

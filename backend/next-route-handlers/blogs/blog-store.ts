@@ -1,6 +1,6 @@
 import { promises as fs } from "fs";
 import path from "path";
-import type { BlogPost } from "../../data";
+import type { BlogPost } from "../../../frontend/app/data";
 
 export type BlogPayload = {
   title?: string;
@@ -10,7 +10,7 @@ export type BlogPayload = {
   content?: string;
 };
 
-const blogsFilePath = path.join(process.cwd(), "data", "blogs.json");
+const blogsFilePath = path.join(process.cwd(), "frontend", "data", "blogs.json");
 
 export function slugify(value: string) {
   return value

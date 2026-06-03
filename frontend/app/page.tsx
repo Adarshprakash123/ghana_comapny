@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
+  blogStorageKey,
   defaultProperties,
   defaultSearchFilters,
   filterStorageKey,
@@ -11,6 +12,7 @@ import {
   type PropertyListing,
   type SearchFilterConfig
 } from "./data";
+import { staticBlogs, staticProperties } from "./static-content";
 
 const navItems = [
   { label: "Home", href: "#" },
@@ -131,45 +133,16 @@ function stripHtml(value: string) {
 export default function Home() {
   const [query, setQuery] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
-  const [blogs, setBlogs] = useState<BlogPost[]>([]);
-  const [properties, setProperties] = useState<PropertyListing[]>(defaultProperties);
+  const [blogs, setBlogs] = useState<BlogPost[]>(staticBlogs);
+  const [properties, setProperties] = useState<PropertyListing[]>(staticProperties);
   const [searchFilters, setSearchFilters] = useState<SearchFilterConfig[]>(defaultSearchFilters);
   const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({});
   const [activeTab, setActiveTab] = useState<"For Sale" | "For Rent">("For Sale");
 
   useEffect(() => {
     setSearchFilters(readStoredJson(filterStorageKey, defaultSearchFilters));
-
-    async function loadProperties() {
-      try {
-        const response = await fetch("/api/properties");
-        if (response.ok) {
-          const data = (await response.json()) as { properties: PropertyListing[] };
-          if (data.properties && data.properties.length > 0) {
-            setProperties(data.properties);
-          }
-        }
-      } catch {
-        // Let it remain defaultProperties
-      }
-    }
-    loadProperties();
-
-    async function loadBlogs() {
-      try {
-        const response = await fetch("/api/blogs");
-        if (!response.ok) {
-          return;
-        }
-
-        const data = (await response.json()) as { blogs: BlogPost[] };
-        setBlogs(data.blogs);
-      } catch {
-        setBlogs([]);
-      }
-    }
-
-    loadBlogs();
+    setProperties(readStoredJson(propertyStorageKey, staticProperties));
+    setBlogs(readStoredJson(blogStorageKey, staticBlogs));
   }, []);
 
   const filteredProperties = useMemo(() => {

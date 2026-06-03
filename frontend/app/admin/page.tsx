@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import {
+  blogStorageKey,
   defaultProperties,
   defaultSearchFilters,
   filterStorageKey,
@@ -11,6 +12,7 @@ import {
   type PropertyListing,
   type SearchFilterConfig
 } from "../data";
+import { staticBlogs, staticProperties } from "../static-content";
 
 type AdminSection = "blog" | "api";
 
@@ -81,8 +83,8 @@ export default function AdminPage() {
   const [blogCoverImage, setBlogCoverImage] = useState("");
   const [blogContent, setBlogContent] = useState("");
   const [editingBlogId, setEditingBlogId] = useState<string | null>(null);
-  const [blogs, setBlogs] = useState<BlogPost[]>([]);
-  const [properties, setProperties] = useState<PropertyListing[]>(defaultProperties);
+  const [blogs, setBlogs] = useState<BlogPost[]>(staticBlogs);
+  const [properties, setProperties] = useState<PropertyListing[]>(staticProperties);
   const [propertyForm, setPropertyForm] = useState<PropertyForm>(emptyPropertyForm);
   const [filters, setFilters] = useState<SearchFilterConfig[]>(defaultSearchFilters);
   const [selectedFilter, setSelectedFilter] = useState("Looking for");
@@ -92,37 +94,8 @@ export default function AdminPage() {
 
   useEffect(() => {
     setFilters(readStoredJson(filterStorageKey, defaultSearchFilters));
-
-    async function loadProperties() {
-      try {
-        const response = await fetch("/api/properties");
-        if (response.ok) {
-          const data = (await response.json()) as { properties: PropertyListing[] };
-          if (data.properties && data.properties.length > 0) {
-            setProperties(data.properties);
-          }
-        }
-      } catch {
-        // Fallback to default
-      }
-    }
-    loadProperties();
-
-    async function loadBlogs() {
-      try {
-        const response = await fetch("/api/blogs");
-        if (!response.ok) {
-          throw new Error("Blog API failed");
-        }
-
-        const data = (await response.json()) as { blogs: BlogPost[] };
-        setBlogs(data.blogs);
-      } catch {
-        setStatusMessage("Could not load blogs from the API.");
-      }
-    }
-
-    loadBlogs();
+    setProperties(readStoredJson(propertyStorageKey, staticProperties));
+    setBlogs(readStoredJson(blogStorageKey, staticBlogs));
   }, []);
 
   useEffect(() => {
@@ -195,40 +168,25 @@ export default function AdminPage() {
       return;
     }
 
-    try {
-      const response = await fetch(
-        editingBlogId ? `/api/blogs/${encodeURIComponent(editingBlogId)}` : "/api/blogs",
-        {
-          method: editingBlogId ? "PUT" : "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            title,
-            slug: blogSlug.trim() || slugify(title),
-            excerpt: blogExcerpt.trim(),
-            coverImage: blogCoverImage.trim(),
-            content
-          })
-        }
-      );
+    const nextBlog: BlogPost = {
+      id: editingBlogId ?? crypto.randomUUID(),
+      title,
+      slug: blogSlug.trim() || slugify(title),
+      excerpt: blogExcerpt.trim(),
+      coverImage: blogCoverImage.trim(),
+      content,
+      createdAt:
+        blogs.find((blog) => blog.id === editingBlogId)?.createdAt ?? new Date().toISOString()
+    };
 
-      if (!response.ok) {
-        const data = (await response.json()) as { error?: string };
-        throw new Error(data.error || "Blog API failed");
-      }
+    const nextBlogs = editingBlogId
+      ? blogs.map((blog) => (blog.id === editingBlogId ? nextBlog : blog))
+      : [nextBlog, ...blogs];
 
-      const data = (await response.json()) as { blogs: BlogPost[] };
-      setBlogs(data.blogs);
-      resetBlogForm();
-      setStatusMessage(
-        editingBlogId
-          ? "Blog updated through PUT /api/blogs/:id."
-          : "Blog created through POST /api/blogs and saved for the homepage."
-      );
-    } catch (error) {
-      setStatusMessage(error instanceof Error ? error.message : "Could not save blog.");
-    }
+    writeStoredJson(blogStorageKey, nextBlogs);
+    setBlogs(nextBlogs);
+    resetBlogForm();
+    setStatusMessage(editingBlogId ? "Blog updated locally." : "Blog created locally.");
   }
 
   function handleEditBlog(blog: BlogPost) {
@@ -241,7 +199,7 @@ export default function AdminPage() {
     if (quillRef.current) {
       quillRef.current.root.innerHTML = blog.content;
     }
-    setStatusMessage(`Editing "${blog.title}". Save to send PUT /api/blogs/${blog.id}.`);
+    setStatusMessage(`Editing "${blog.title}". Save to update the local data.`);
   }
 
   async function handleDeleteBlog(blog: BlogPost) {
@@ -250,28 +208,13 @@ export default function AdminPage() {
       return;
     }
 
-    try {
-      const response = await fetch(`/api/blogs/${encodeURIComponent(blog.id)}`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json"
-        }
-      });
-
-      if (!response.ok) {
-        const data = (await response.json()) as { error?: string };
-        throw new Error(data.error || "Blog API failed");
-      }
-
-      const data = (await response.json()) as { blogs: BlogPost[] };
-      setBlogs(data.blogs);
-      if (editingBlogId === blog.id) {
-        resetBlogForm();
-      }
-      setStatusMessage("Blog deleted through DELETE /api/blogs/:id.");
-    } catch (error) {
-      setStatusMessage(error instanceof Error ? error.message : "Could not delete blog.");
+    const nextBlogs = blogs.filter((item) => item.id !== blog.id);
+    writeStoredJson(blogStorageKey, nextBlogs);
+    setBlogs(nextBlogs);
+    if (editingBlogId === blog.id) {
+      resetBlogForm();
     }
+    setStatusMessage("Blog deleted locally.");
   }
 
   async function handleCreateProperty(event: FormEvent<HTMLFormElement>) {
@@ -281,24 +224,15 @@ export default function AdminPage() {
       return;
     }
 
-    try {
-      const response = await fetch("/api/properties", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(propertyForm)
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to create property via API.");
-      }
-
-      const data = (await response.json()) as { properties: PropertyListing[] };
-      setProperties(data.properties);
-      setPropertyForm(emptyPropertyForm);
-      setStatusMessage("Search API dummy data created via API. Go to the homepage and search for it.");
-    } catch {
-      setStatusMessage("Could not create property via API.");
-    }
+    const nextProperty: PropertyListing = {
+      id: `${slugify(propertyForm.title)}-${Date.now()}`,
+      ...propertyForm
+    };
+    const nextProperties = [nextProperty, ...properties];
+    writeStoredJson(propertyStorageKey, nextProperties);
+    setProperties(nextProperties);
+    setPropertyForm(emptyPropertyForm);
+    setStatusMessage("Property created locally for the exported site.");
   }
 
   function updatePropertyField(field: keyof PropertyForm, value: string) {
@@ -332,7 +266,7 @@ export default function AdminPage() {
     setFilters(nextFilters);
     writeStoredJson(filterStorageKey, nextFilters);
     setNewOption("");
-    setStatusMessage("Search filter option updated for the homepage dummy API.");
+    setStatusMessage("Search filter option updated locally.");
   }
 
   function removeFilterOption(filterLabel: string, option: string) {
@@ -355,11 +289,13 @@ export default function AdminPage() {
   }
 
   function resetDummyData() {
-    setProperties(defaultProperties);
+    setProperties(staticProperties);
+    setBlogs(staticBlogs);
     setFilters(defaultSearchFilters);
-    writeStoredJson(propertyStorageKey, defaultProperties);
+    writeStoredJson(propertyStorageKey, staticProperties);
+    writeStoredJson(blogStorageKey, staticBlogs);
     writeStoredJson(filterStorageKey, defaultSearchFilters);
-    setStatusMessage("Dummy API data reset to the starter values.");
+    setStatusMessage("Local data reset to the starter values.");
   }
 
   return (
@@ -380,7 +316,7 @@ export default function AdminPage() {
           className={`admin-nav-button ${activeSection === "api" ? "active" : ""}`}
           onClick={() => setActiveSection("api")}
         >
-          API Data
+          Site Data
         </button>
       </aside>
 
@@ -388,7 +324,7 @@ export default function AdminPage() {
         <header className="admin-header">
           <div>
             <p className="admin-kicker">Admin Frontend</p>
-            <h1>{activeSection === "blog" ? "Create Blog" : "Create Search API Data"}</h1>
+            <h1>{activeSection === "blog" ? "Create Blog" : "Create Search Data"}</h1>
           </div>
           <Link href="/" className="admin-home-link">
             View Site
@@ -465,10 +401,10 @@ export default function AdminPage() {
             </form>
 
             <div className="admin-panel">
-              <h2>Blog API Preview</h2>
+              <h2>Blog Preview</h2>
               <div className="admin-preview-list">
                 {blogs.length === 0 ? (
-                  <p className="admin-muted">No blog payloads yet.</p>
+                  <p className="admin-muted">No blogs yet.</p>
                 ) : (
                   blogs.map((blog) => (
                     <article key={blog.id} className="admin-preview-card">
@@ -609,7 +545,7 @@ export default function AdminPage() {
               </label>
 
               <button type="submit" className="admin-primary-button">
-                Create API Data
+                Create Property
               </button>
             </form>
 
@@ -656,7 +592,7 @@ export default function AdminPage() {
                 )}
               </div>
 
-              <h2>Created API Records</h2>
+              <h2>Created Records</h2>
               <div className="admin-preview-list">
                 {properties.map((property) => (
                   <article key={property.id} className="admin-preview-card">
@@ -674,16 +610,10 @@ export default function AdminPage() {
                         onClick={async () => {
                           const confirmed = window.confirm(`Delete "${property.title}"?`);
                           if (!confirmed) return;
-                          try {
-                            const response = await fetch(`/api/properties/${encodeURIComponent(property.id)}`, { method: "DELETE" });
-                            if (response.ok) {
-                              const data = await response.json() as { properties: PropertyListing[] };
-                              setProperties(data.properties);
-                              setStatusMessage("Property deleted.");
-                            }
-                          } catch {
-                            setStatusMessage("Failed to delete property.");
-                          }
+                          const nextProperties = properties.filter((item) => item.id !== property.id);
+                          writeStoredJson(propertyStorageKey, nextProperties);
+                          setProperties(nextProperties);
+                          setStatusMessage("Property deleted locally.");
                         }}
                       >
                         Delete
@@ -694,7 +624,7 @@ export default function AdminPage() {
               </div>
 
               <button type="button" className="admin-secondary-button" onClick={resetDummyData}>
-                Reset Dummy API Data
+                Reset Local Data
               </button>
             </div>
           </div>

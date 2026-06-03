@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import type { PropertyListing } from "../../data";
+import type { PropertyListing } from "../../../frontend/app/data";
 import { type PropertyPayload, readProperties, slugify, writeProperties } from "./property-store";
 
 export const runtime = "nodejs";
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     city: payload.city?.trim() ?? "Accra",
     location: payload.location?.trim() ?? "",
     type: payload.type?.trim() ?? "Apartment",
-    status: (payload.status === "For Rent" ? "For Rent" : "For Sale"),
+    status: payload.status === "For Rent" ? "For Rent" : "For Sale",
     meta: payload.meta?.trim() ?? "",
     description: payload.description?.trim() ?? "",
     price: payload.price?.trim() ?? "GHC 0",

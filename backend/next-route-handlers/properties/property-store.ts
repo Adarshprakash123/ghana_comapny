@@ -1,10 +1,10 @@
 import { promises as fs } from "fs";
 import path from "path";
-import type { PropertyListing } from "../../data";
+import type { PropertyListing } from "../../../frontend/app/data";
 
 export type PropertyPayload = Omit<PropertyListing, "id"> & { id?: string };
 
-const propertiesFilePath = path.join(process.cwd(), "data", "properties.json");
+const propertiesFilePath = path.join(process.cwd(), "frontend", "data", "properties.json");
 
 export function slugify(value: string) {
   return value
