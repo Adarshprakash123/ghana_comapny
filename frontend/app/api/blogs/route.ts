@@ -1,15 +1,28 @@
-import { NextResponse } from "next/server";
-import type { BlogPost } from "../../../frontend/app/data";
-import { type BlogPayload, readBlogs, slugify, writeBlogs } from "./blog-store";
+import { NextRequest, NextResponse } from "next/server";
+import type { BlogPost } from "@/app/data";
+import { readAdminSessionFromRequest } from "@/lib/server/admin-auth";
+import { readBlogs, slugify, writeBlogs } from "@/lib/server/content-store";
 
 export const runtime = "nodejs";
+
+type BlogPayload = {
+  title?: string;
+  slug?: string;
+  excerpt?: string;
+  coverImage?: string;
+  content?: string;
+};
 
 export async function GET() {
   const blogs = await readBlogs();
   return NextResponse.json({ blogs });
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  if (!readAdminSessionFromRequest(request)) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
   const payload = (await request.json()) as BlogPayload;
   const title = payload.title?.trim() ?? "";
   const content = payload.content?.trim() ?? "";

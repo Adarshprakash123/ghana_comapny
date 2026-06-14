@@ -1,23 +1,27 @@
-import { NextResponse } from "next/server";
-import type { PropertyListing } from "../../../frontend/app/data";
-import { type PropertyPayload, readProperties, slugify, writeProperties } from "./property-store";
+import { NextRequest, NextResponse } from "next/server";
+import type { PropertyListing } from "@/app/data";
+import { readAdminSessionFromRequest } from "@/lib/server/admin-auth";
+import { readProperties, slugify, writeProperties } from "@/lib/server/content-store";
 
 export const runtime = "nodejs";
+
+type PropertyPayload = Omit<PropertyListing, "id"> & { id?: string };
 
 export async function GET() {
   const properties = await readProperties();
   return NextResponse.json({ properties });
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  if (!readAdminSessionFromRequest(request)) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
   const payload = (await request.json()) as PropertyPayload;
   const title = payload.title?.trim() ?? "";
 
   if (!title) {
-    return NextResponse.json(
-      { error: "Title is required." },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Title is required." }, { status: 400 });
   }
 
   const property: PropertyListing = {

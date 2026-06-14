@@ -1,15 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { staticBlogs } from "../../static-content";
+import { readBlogs } from "@/lib/server/content-store";
 
-export const dynamicParams = false;
-
-export function generateStaticParams() {
-  return staticBlogs.map((blog) => ({
-    slug: blog.slug
-  }));
-}
+export const dynamic = "force-dynamic";
 
 export default async function BlogPage({
   params
@@ -17,7 +11,8 @@ export default async function BlogPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const blog = staticBlogs.find((item) => item.slug === slug);
+  const blogs = await readBlogs();
+  const blog = blogs.find((item) => item.slug === slug);
 
   if (!blog) {
     notFound();

@@ -1,16 +1,23 @@
-import { NextResponse } from "next/server";
-import type { BlogPost } from "../../../../frontend/app/data";
-import { type BlogPayload, readBlogs, slugify, writeBlogs } from "../blog-store";
+import { NextRequest, NextResponse } from "next/server";
+import type { BlogPost } from "@/app/data";
+import { readAdminSessionFromRequest } from "@/lib/server/admin-auth";
+import { readBlogs, slugify, writeBlogs } from "@/lib/server/content-store";
 
 export const runtime = "nodejs";
 
-type RouteContext = {
-  params: Promise<{
-    id: string;
-  }>;
+type BlogPayload = {
+  title?: string;
+  slug?: string;
+  excerpt?: string;
+  coverImage?: string;
+  content?: string;
 };
 
-export async function GET(_request: Request, context: RouteContext) {
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
+
+export async function GET(_request: NextRequest, context: RouteContext) {
   const { id } = await context.params;
   const blogs = await readBlogs();
   const blog = blogs.find((item) => item.id === id);
@@ -22,7 +29,11 @@ export async function GET(_request: Request, context: RouteContext) {
   return NextResponse.json({ blog });
 }
 
-export async function PUT(request: Request, context: RouteContext) {
+export async function PUT(request: NextRequest, context: RouteContext) {
+  if (!readAdminSessionFromRequest(request)) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
   const { id } = await context.params;
   const payload = (await request.json()) as BlogPayload;
   const title = payload.title?.trim() ?? "";
@@ -50,13 +61,18 @@ export async function PUT(request: Request, context: RouteContext) {
     coverImage: payload.coverImage?.trim() ?? "",
     content
   };
+
   const nextBlogs = blogs.map((blog) => (blog.id === id ? updatedBlog : blog));
   await writeBlogs(nextBlogs);
 
   return NextResponse.json({ blog: updatedBlog, blogs: nextBlogs });
 }
 
-export async function DELETE(_request: Request, context: RouteContext) {
+export async function DELETE(request: NextRequest, context: RouteContext) {
+  if (!readAdminSessionFromRequest(request)) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
   const { id } = await context.params;
   const blogs = await readBlogs();
   const nextBlogs = blogs.filter((blog) => blog.id !== id);

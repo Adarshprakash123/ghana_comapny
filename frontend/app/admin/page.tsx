@@ -3,18 +3,15 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import {
-  blogStorageKey,
-  defaultProperties,
   defaultSearchFilters,
-  filterStorageKey,
-  propertyStorageKey,
   type BlogPost,
   type PropertyListing,
-  type SearchFilterConfig
+  type SearchFilterConfig,
+  type SiteSettings
 } from "../data";
-import { staticBlogs, staticProperties } from "../static-content";
 
 type AdminSection = "blog" | "api";
+type UploadTarget = "blog" | "property" | null;
 
 type PropertyForm = Omit<PropertyListing, "id">;
 
@@ -28,6 +25,13 @@ type QuillConstructor = new (
   options: Record<string, unknown>
 ) => QuillInstance;
 
+type SiteDataResponse = {
+  blogs: BlogPost[];
+  properties: PropertyListing[];
+  filters: SearchFilterConfig[];
+  settings: SiteSettings;
+};
+
 const emptyPropertyForm: PropertyForm = {
   city: "Accra",
   location: "Airport Residential",
@@ -40,30 +44,8 @@ const emptyPropertyForm: PropertyForm = {
   beds: "3 Bedrooms",
   baths: "3 Bathrooms",
   parking: "1 Parking Spaces",
-  image:
-    "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=1600&q=80"
+  image: ""
 };
-
-function readStoredJson<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") {
-    return fallback;
-  }
-
-  const value = window.localStorage.getItem(key);
-  if (!value) {
-    return fallback;
-  }
-
-  try {
-    return JSON.parse(value) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-function writeStoredJson<T>(key: string, value: T) {
-  window.localStorage.setItem(key, JSON.stringify(value));
-}
 
 function slugify(value: string) {
   return value
@@ -73,30 +55,37 @@ function slugify(value: string) {
     .replace(/^-|-$/g, "");
 }
 
+async function readJson<T>(response: Response) {
+  return (await response.json()) as T;
+}
+
 export default function AdminPage() {
   const [activeSection, setActiveSection] = useState<AdminSection>("blog");
   const [quillReady, setQuillReady] = useState(false);
   const [quillFailed, setQuillFailed] = useState(false);
+  const [sessionChecked, setSessionChecked] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authEmail, setAuthEmail] = useState("");
+  const [configReady, setConfigReady] = useState(true);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
   const [blogTitle, setBlogTitle] = useState("");
   const [blogSlug, setBlogSlug] = useState("");
   const [blogExcerpt, setBlogExcerpt] = useState("");
   const [blogCoverImage, setBlogCoverImage] = useState("");
   const [blogContent, setBlogContent] = useState("");
   const [editingBlogId, setEditingBlogId] = useState<string | null>(null);
-  const [blogs, setBlogs] = useState<BlogPost[]>(staticBlogs);
-  const [properties, setProperties] = useState<PropertyListing[]>(staticProperties);
+  const [blogs, setBlogs] = useState<BlogPost[]>([]);
+  const [properties, setProperties] = useState<PropertyListing[]>([]);
   const [propertyForm, setPropertyForm] = useState<PropertyForm>(emptyPropertyForm);
   const [filters, setFilters] = useState<SearchFilterConfig[]>(defaultSearchFilters);
+  const [siteSettings, setSiteSettings] = useState<SiteSettings>({ googleFormUrl: "" });
   const [selectedFilter, setSelectedFilter] = useState("Looking for");
   const [newOption, setNewOption] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [uploadingTarget, setUploadingTarget] = useState<UploadTarget>(null);
   const quillRef = useRef<QuillInstance | null>(null);
-
-  useEffect(() => {
-    setFilters(readStoredJson(filterStorageKey, defaultSearchFilters));
-    setProperties(readStoredJson(propertyStorageKey, staticProperties));
-    setBlogs(readStoredJson(blogStorageKey, staticBlogs));
-  }, []);
 
   useEffect(() => {
     const existingQuill = (window as unknown as { Quill?: QuillConstructor }).Quill;
@@ -119,7 +108,7 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => {
-    if (!quillReady || quillRef.current || activeSection !== "blog") {
+    if (!quillReady || quillRef.current || activeSection !== "blog" || !isAuthenticated) {
       return;
     }
 
@@ -144,7 +133,62 @@ export default function AdminPage() {
     quillRef.current.on("text-change", () => {
       setBlogContent(quillRef.current?.root.innerHTML ?? "");
     });
-  }, [activeSection, quillReady]);
+  }, [activeSection, isAuthenticated, quillReady]);
+
+  useEffect(() => {
+    void initializeAdmin();
+  }, []);
+
+  useEffect(() => {
+    if (!filters.some((filter) => filter.label === selectedFilter)) {
+      const firstFilter = filters.find((filter) => filter.type === "checkbox-list");
+      if (firstFilter) {
+        setSelectedFilter(firstFilter.label);
+      }
+    }
+  }, [filters, selectedFilter]);
+
+  useEffect(() => {
+    if (quillRef.current && quillRef.current.root.innerHTML !== blogContent) {
+      quillRef.current.root.innerHTML = blogContent;
+    }
+  }, [blogContent]);
+
+  async function initializeAdmin() {
+    try {
+      const sessionResponse = await fetch("/api/admin/session", { cache: "no-store" });
+      const sessionPayload = await readJson<{
+        authenticated: boolean;
+        email: string | null;
+        configReady: boolean;
+      }>(sessionResponse);
+
+      setConfigReady(sessionPayload.configReady);
+      setIsAuthenticated(sessionPayload.authenticated);
+      setAuthEmail(sessionPayload.email ?? "");
+      setLoginEmail(sessionPayload.email ?? "");
+
+      if (sessionPayload.authenticated) {
+        await loadSiteData();
+      }
+    } catch {
+      setStatusMessage("Could not load the admin session.");
+    } finally {
+      setSessionChecked(true);
+    }
+  }
+
+  async function loadSiteData() {
+    const response = await fetch("/api/site-data", { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error("Could not load site data.");
+    }
+    const payload = await readJson<SiteDataResponse>(response);
+    setBlogs(payload.blogs);
+    setProperties(payload.properties);
+    setFilters(payload.filters);
+    setSiteSettings(payload.settings);
+  }
 
   function resetBlogForm() {
     setEditingBlogId(null);
@@ -158,35 +202,142 @@ export default function AdminPage() {
     }
   }
 
+  async function handleLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSaving(true);
+    setStatusMessage("");
+
+    try {
+      const response = await fetch("/api/admin/session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email: loginEmail.trim(),
+          password: loginPassword
+        })
+      });
+      const payload = await readJson<{ authenticated?: boolean; email?: string; error?: string }>(
+        response
+      );
+
+      if (!response.ok) {
+        setStatusMessage(payload.error ?? "Login failed.");
+        return;
+      }
+
+      setIsAuthenticated(true);
+      setAuthEmail(payload.email ?? loginEmail.trim());
+      setLoginPassword("");
+      await loadSiteData();
+      setStatusMessage("Admin access granted.");
+    } catch {
+      setStatusMessage("Could not log in.");
+    } finally {
+      setIsSaving(false);
+      setSessionChecked(true);
+    }
+  }
+
+  async function handleLogout() {
+    setIsSaving(true);
+
+    try {
+      await fetch("/api/admin/session", { method: "DELETE" });
+      setIsAuthenticated(false);
+      setAuthEmail("");
+      setBlogs([]);
+      setProperties([]);
+      setStatusMessage("You have been logged out.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleUploadImage(file: File, target: Exclude<UploadTarget, null>) {
+    setUploadingTarget(target);
+    setStatusMessage(`Uploading ${target} image...`);
+
+    try {
+      const formData = new FormData();
+      const derivedFileName =
+        target === "blog"
+          ? `${blogSlug.trim() || slugify(blogTitle) || "blog-cover"}-${Date.now()}`
+          : `${slugify(propertyForm.title) || "property-image"}-${Date.now()}`;
+
+      formData.append("file", file);
+      formData.append("fileName", derivedFileName);
+      formData.append("folder", target === "blog" ? "/blogs" : "/properties");
+      formData.append("tags", target === "blog" ? "blog,cover" : "property,listing");
+      formData.append("useUniqueFileName", "true");
+
+      const response = await fetch("/api/admin/uploads", {
+        method: "POST",
+        body: formData
+      });
+      const payload = await readJson<{ imageUrl?: string; error?: string }>(response);
+
+      if (!response.ok || !payload.imageUrl) {
+        setStatusMessage(payload.error ?? "Image upload failed.");
+        return;
+      }
+
+      if (target === "blog") {
+        setBlogCoverImage(payload.imageUrl);
+      } else {
+        updatePropertyField("image", payload.imageUrl);
+      }
+
+      setStatusMessage("Image uploaded successfully.");
+    } catch {
+      setStatusMessage("Could not upload the image.");
+    } finally {
+      setUploadingTarget(null);
+    }
+  }
+
   async function handleSaveBlog(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const title = blogTitle.trim();
     const content = blogContent.trim();
 
     if (!title || !content) {
-      setStatusMessage("Add a title and blog content before creating the blog.");
+      setStatusMessage("Add a title and blog content before saving the blog.");
       return;
     }
 
-    const nextBlog: BlogPost = {
-      id: editingBlogId ?? crypto.randomUUID(),
-      title,
-      slug: blogSlug.trim() || slugify(title),
-      excerpt: blogExcerpt.trim(),
-      coverImage: blogCoverImage.trim(),
-      content,
-      createdAt:
-        blogs.find((blog) => blog.id === editingBlogId)?.createdAt ?? new Date().toISOString()
-    };
+    setIsSaving(true);
 
-    const nextBlogs = editingBlogId
-      ? blogs.map((blog) => (blog.id === editingBlogId ? nextBlog : blog))
-      : [nextBlog, ...blogs];
+    try {
+      const response = await fetch(editingBlogId ? `/api/blogs/${editingBlogId}` : "/api/blogs", {
+        method: editingBlogId ? "PUT" : "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          title,
+          slug: blogSlug.trim() || slugify(title),
+          excerpt: blogExcerpt.trim(),
+          coverImage: blogCoverImage.trim(),
+          content
+        })
+      });
+      const payload = await readJson<{ blogs?: BlogPost[]; error?: string }>(response);
 
-    writeStoredJson(blogStorageKey, nextBlogs);
-    setBlogs(nextBlogs);
-    resetBlogForm();
-    setStatusMessage(editingBlogId ? "Blog updated locally." : "Blog created locally.");
+      if (!response.ok || !payload.blogs) {
+        setStatusMessage(payload.error ?? "Could not save the blog.");
+        return;
+      }
+
+      setBlogs(payload.blogs);
+      resetBlogForm();
+      setStatusMessage(editingBlogId ? "Blog updated." : "Blog created.");
+    } catch {
+      setStatusMessage("Could not save the blog.");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   function handleEditBlog(blog: BlogPost) {
@@ -199,7 +350,7 @@ export default function AdminPage() {
     if (quillRef.current) {
       quillRef.current.root.innerHTML = blog.content;
     }
-    setStatusMessage(`Editing "${blog.title}". Save to update the local data.`);
+    setStatusMessage(`Editing "${blog.title}".`);
   }
 
   async function handleDeleteBlog(blog: BlogPost) {
@@ -208,31 +359,64 @@ export default function AdminPage() {
       return;
     }
 
-    const nextBlogs = blogs.filter((item) => item.id !== blog.id);
-    writeStoredJson(blogStorageKey, nextBlogs);
-    setBlogs(nextBlogs);
-    if (editingBlogId === blog.id) {
-      resetBlogForm();
+    setIsSaving(true);
+
+    try {
+      const response = await fetch(`/api/blogs/${blog.id}`, {
+        method: "DELETE"
+      });
+      const payload = await readJson<{ blogs?: BlogPost[]; error?: string }>(response);
+
+      if (!response.ok || !payload.blogs) {
+        setStatusMessage(payload.error ?? "Could not delete the blog.");
+        return;
+      }
+
+      setBlogs(payload.blogs);
+      if (editingBlogId === blog.id) {
+        resetBlogForm();
+      }
+      setStatusMessage("Blog deleted.");
+    } catch {
+      setStatusMessage("Could not delete the blog.");
+    } finally {
+      setIsSaving(false);
     }
-    setStatusMessage("Blog deleted locally.");
   }
 
   async function handleCreateProperty(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
     if (!propertyForm.title.trim()) {
-      setStatusMessage("Add a property title before creating API data.");
+      setStatusMessage("Add a property title before saving site data.");
       return;
     }
 
-    const nextProperty: PropertyListing = {
-      id: `${slugify(propertyForm.title)}-${Date.now()}`,
-      ...propertyForm
-    };
-    const nextProperties = [nextProperty, ...properties];
-    writeStoredJson(propertyStorageKey, nextProperties);
-    setProperties(nextProperties);
-    setPropertyForm(emptyPropertyForm);
-    setStatusMessage("Property created locally for the exported site.");
+    setIsSaving(true);
+
+    try {
+      const response = await fetch("/api/properties", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(propertyForm)
+      });
+      const payload = await readJson<{ properties?: PropertyListing[]; error?: string }>(response);
+
+      if (!response.ok || !payload.properties) {
+        setStatusMessage(payload.error ?? "Could not create the property.");
+        return;
+      }
+
+      setProperties(payload.properties);
+      setPropertyForm(emptyPropertyForm);
+      setStatusMessage("Property created.");
+    } catch {
+      setStatusMessage("Could not create the property.");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   function updatePropertyField(field: keyof PropertyForm, value: string) {
@@ -242,9 +426,38 @@ export default function AdminPage() {
     }));
   }
 
+  async function saveFilters(nextFilters: SearchFilterConfig[], message: string) {
+    setFilters(nextFilters);
+    setIsSaving(true);
+
+    try {
+      const response = await fetch("/api/site-data", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ filters: nextFilters })
+      });
+      const payload = await readJson<{ filters?: SearchFilterConfig[]; error?: string }>(response);
+
+      if (!response.ok || !payload.filters) {
+        setStatusMessage(payload.error ?? "Could not update the search filters.");
+        return;
+      }
+
+      setFilters(payload.filters);
+      setStatusMessage(message);
+    } catch {
+      setStatusMessage("Could not update the search filters.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   function addFilterOption(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const cleanOption = newOption.trim();
+
     if (!cleanOption) {
       return;
     }
@@ -263,10 +476,9 @@ export default function AdminPage() {
         options: [...filter.options, cleanOption]
       };
     });
-    setFilters(nextFilters);
-    writeStoredJson(filterStorageKey, nextFilters);
+
     setNewOption("");
-    setStatusMessage("Search filter option updated locally.");
+    void saveFilters(nextFilters, "Search filter option added.");
   }
 
   function removeFilterOption(filterLabel: string, option: string) {
@@ -284,18 +496,123 @@ export default function AdminPage() {
         options: filter.options.filter((item) => item !== option)
       };
     });
-    setFilters(nextFilters);
-    writeStoredJson(filterStorageKey, nextFilters);
+
+    void saveFilters(nextFilters, "Search filter option removed.");
   }
 
-  function resetDummyData() {
-    setProperties(staticProperties);
-    setBlogs(staticBlogs);
-    setFilters(defaultSearchFilters);
-    writeStoredJson(propertyStorageKey, staticProperties);
-    writeStoredJson(blogStorageKey, staticBlogs);
-    writeStoredJson(filterStorageKey, defaultSearchFilters);
-    setStatusMessage("Local data reset to the starter values.");
+  async function handleSaveGoogleFormUrl() {
+    setIsSaving(true);
+
+    try {
+      const response = await fetch("/api/site-data", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ settings: siteSettings })
+      });
+      const payload = await readJson<{ settings?: SiteSettings; error?: string }>(response);
+
+      if (!response.ok || !payload.settings) {
+        setStatusMessage(payload.error ?? "Could not save the Google Form link.");
+        return;
+      }
+
+      setSiteSettings(payload.settings);
+      setStatusMessage("Google Form link saved.");
+    } catch {
+      setStatusMessage("Could not save the Google Form link.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleDeleteProperty(property: PropertyListing) {
+    const confirmed = window.confirm(`Delete "${property.title}"?`);
+    if (!confirmed) {
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      const response = await fetch(`/api/properties/${property.id}`, {
+        method: "DELETE"
+      });
+      const payload = await readJson<{ properties?: PropertyListing[]; error?: string }>(response);
+
+      if (!response.ok || !payload.properties) {
+        setStatusMessage(payload.error ?? "Could not delete the property.");
+        return;
+      }
+
+      setProperties(payload.properties);
+      setStatusMessage("Property deleted.");
+    } catch {
+      setStatusMessage("Could not delete the property.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  if (!sessionChecked) {
+    return (
+      <main className="admin-shell">
+        <section className="admin-content" style={{ display: "grid", placeItems: "center" }}>
+          <p className="admin-status">Checking admin access...</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <main className="admin-shell">
+        <section className="admin-content" style={{ maxWidth: 560, margin: "0 auto" }}>
+          <header className="admin-header">
+            <div>
+              <p className="admin-kicker">Admin Access</p>
+              <h1>Sign in to Fairhaven Admin</h1>
+            </div>
+            <Link href="/" className="admin-home-link">
+              View Site
+            </Link>
+          </header>
+
+          {!configReady && (
+            <p className="admin-status">
+              Admin credentials are not configured yet. Add them to `frontend/.env.local`.
+            </p>
+          )}
+
+          {statusMessage && <p className="admin-status">{statusMessage}</p>}
+
+          <form className="admin-panel admin-form" onSubmit={handleLogin}>
+            <label>
+              Admin Gmail
+              <input
+                type="email"
+                value={loginEmail}
+                onChange={(event) => setLoginEmail(event.target.value)}
+                placeholder="admin@gmail.com"
+              />
+            </label>
+            <label>
+              Password
+              <input
+                type="password"
+                value={loginPassword}
+                onChange={(event) => setLoginPassword(event.target.value)}
+                placeholder="Password"
+              />
+            </label>
+            <button type="submit" className="admin-primary-button" disabled={isSaving || !configReady}>
+              {isSaving ? "Signing In..." : "Sign In"}
+            </button>
+          </form>
+        </section>
+      </main>
+    );
   }
 
   return (
@@ -325,10 +642,16 @@ export default function AdminPage() {
           <div>
             <p className="admin-kicker">Admin Frontend</p>
             <h1>{activeSection === "blog" ? "Create Blog" : "Create Search Data"}</h1>
+            <p className="admin-muted">Signed in as {authEmail}</p>
           </div>
-          <Link href="/" className="admin-home-link">
-            View Site
-          </Link>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+            <Link href="/" className="admin-home-link">
+              View Site
+            </Link>
+            <button type="button" className="admin-secondary-button" onClick={handleLogout}>
+              Logout
+            </button>
+          </div>
         </header>
 
         {statusMessage && <p className="admin-status">{statusMessage}</p>}
@@ -358,12 +681,21 @@ export default function AdminPage() {
                 />
               </label>
               <label>
-                Cover Image URL
+                Cover Image
+                <input type="text" value={blogCoverImage} readOnly placeholder="Upload an image below" />
+              </label>
+              <label>
+                Upload Cover Image
                 <input
-                  type="url"
-                  value={blogCoverImage}
-                  onChange={(event) => setBlogCoverImage(event.target.value)}
-                  placeholder="https://..."
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) {
+                      void handleUploadImage(file, "blog");
+                    }
+                    event.currentTarget.value = "";
+                  }}
                 />
               </label>
               <label>
@@ -390,9 +722,10 @@ export default function AdminPage() {
                 )}
               </div>
 
-              <button type="submit" className="admin-primary-button">
+              <button type="submit" className="admin-primary-button" disabled={isSaving}>
                 {editingBlogId ? "Update Blog" : "Create Blog"}
               </button>
+              {uploadingTarget === "blog" && <p className="admin-muted">Uploading blog image...</p>}
               {editingBlogId && (
                 <button type="button" className="admin-secondary-button" onClick={resetBlogForm}>
                   Cancel Edit
@@ -418,7 +751,7 @@ export default function AdminPage() {
                         <button
                           type="button"
                           className="danger"
-                          onClick={() => handleDeleteBlog(blog)}
+                          onClick={() => void handleDeleteBlog(blog)}
                         >
                           Delete
                         </button>
@@ -527,11 +860,21 @@ export default function AdminPage() {
               </div>
 
               <label>
-                Image URL
+                Uploaded Image URL
+                <input type="text" value={propertyForm.image} readOnly placeholder="Upload an image below" />
+              </label>
+              <label>
+                Upload Property Image
                 <input
-                  type="url"
-                  value={propertyForm.image}
-                  onChange={(event) => updatePropertyField("image", event.target.value)}
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) {
+                      void handleUploadImage(file, "property");
+                    }
+                    event.currentTarget.value = "";
+                  }}
                 />
               </label>
               <label>
@@ -544,9 +887,10 @@ export default function AdminPage() {
                 />
               </label>
 
-              <button type="submit" className="admin-primary-button">
+              <button type="submit" className="admin-primary-button" disabled={isSaving}>
                 Create Property
               </button>
+              {uploadingTarget === "property" && <p className="admin-muted">Uploading property image...</p>}
             </form>
 
             <div className="admin-panel">
@@ -592,6 +936,29 @@ export default function AdminPage() {
                 )}
               </div>
 
+              <h2>Google Form Link</h2>
+              <label style={{ display: "block", marginBottom: "1rem" }}>
+                Contact Form URL
+                <input
+                  type="url"
+                  value={siteSettings.googleFormUrl}
+                  onChange={(event) =>
+                    setSiteSettings((current) => ({
+                      ...current,
+                      googleFormUrl: event.target.value
+                    }))
+                  }
+                  placeholder="https://forms.gle/..."
+                />
+              </label>
+              <button
+                type="button"
+                className="admin-secondary-button"
+                onClick={() => void handleSaveGoogleFormUrl()}
+              >
+                Save Google Form Link
+              </button>
+
               <h2>Created Records</h2>
               <div className="admin-preview-list">
                 {properties.map((property) => (
@@ -607,14 +974,7 @@ export default function AdminPage() {
                       <button
                         type="button"
                         className="danger"
-                        onClick={async () => {
-                          const confirmed = window.confirm(`Delete "${property.title}"?`);
-                          if (!confirmed) return;
-                          const nextProperties = properties.filter((item) => item.id !== property.id);
-                          writeStoredJson(propertyStorageKey, nextProperties);
-                          setProperties(nextProperties);
-                          setStatusMessage("Property deleted locally.");
-                        }}
+                        onClick={() => void handleDeleteProperty(property)}
                       >
                         Delete
                       </button>
@@ -622,10 +982,6 @@ export default function AdminPage() {
                   </article>
                 ))}
               </div>
-
-              <button type="button" className="admin-secondary-button" onClick={resetDummyData}>
-                Reset Local Data
-              </button>
             </div>
           </div>
         )}

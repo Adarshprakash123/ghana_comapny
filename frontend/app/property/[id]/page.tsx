@@ -1,7 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { staticProperties } from "../../static-content";
+import { readProperties, readSiteSettings } from "@/lib/server/content-store";
+
+export const dynamic = "force-dynamic";
 
 const dummyImages = [
   "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80",
@@ -12,21 +14,16 @@ const dummyImages = [
   "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=1200&q=80"
 ];
 
-export const dynamicParams = false;
-
-export function generateStaticParams() {
-  return staticProperties.map((property) => ({
-    id: property.id
-  }));
-}
-
 export default async function PropertyPage({
   params
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const property = staticProperties.find((item) => item.id === id);
+  const [properties, siteSettings] = await Promise.all([readProperties(), readSiteSettings()]);
+  const property = properties.find((item) => item.id === id);
+  const googleFormHref = siteSettings.googleFormUrl.trim() || "/#contact";
+  const opensExternalGoogleForm = googleFormHref.startsWith("http");
 
   if (!property) {
     notFound();
@@ -248,7 +245,9 @@ export default async function PropertyPage({
               Contact Fairhaven to schedule a viewing or request more information about this {property.type}.
             </p>
             <a
-              href="#google-form-link"
+              href={googleFormHref}
+              target={opensExternalGoogleForm ? "_blank" : undefined}
+              rel={opensExternalGoogleForm ? "noreferrer" : undefined}
               style={{
                 display: "block",
                 textAlign: "center",

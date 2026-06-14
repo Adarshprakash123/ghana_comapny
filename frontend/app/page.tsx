@@ -3,23 +3,20 @@
 import Image from "next/image";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
-  blogStorageKey,
-  defaultProperties,
   defaultSearchFilters,
-  filterStorageKey,
-  propertyStorageKey,
   type BlogPost,
   type PropertyListing,
-  type SearchFilterConfig
+  type SearchFilterConfig,
+  type SiteSettings
 } from "./data";
 import { staticBlogs, staticProperties } from "./static-content";
 
 const navItems = [
   { label: "Home", href: "#" },
-  { label: "About Us", href: "#" },
+  { label: "About Us", href: "#about" },
   {
     label: "Our Services",
-    href: "#",
+    href: "#services",
     dropdown: ["Sales", "Property Management", "Relocation Management"]
   },
   {
@@ -28,8 +25,8 @@ const navItems = [
     dropdown: ["Rent", "Sale"]
   },
   { label: "Blog", href: "#blog" },
-  { label: "Careers", href: "#" },
-  { label: "Contact Us", href: "#" }
+  { label: "Careers", href: "#careers" },
+  { label: "Contact Us", href: "#contact" }
 ];
 
 const serviceCards = [
@@ -77,8 +74,14 @@ const neighborhoods = [
   }
 ];
 
-const footerLinks = ["About Us", "Our Services", "For Sale", "For Rent", "Blog", "Careers"];
-const googleFormHref = "#google-form-link";
+const footerLinks = [
+  { label: "About Us", href: "#about" },
+  { label: "Our Services", href: "#services" },
+  { label: "For Sale", href: "#properties" },
+  { label: "For Rent", href: "#properties" },
+  { label: "Blog", href: "#blog" },
+  { label: "Careers", href: "#careers" }
+];
 const socialLinks = [
   {
     label: "Facebook",
@@ -109,23 +112,6 @@ const socialLinks = [
   }
 ];
 
-function readStoredJson<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") {
-    return fallback;
-  }
-
-  const value = window.localStorage.getItem(key);
-  if (!value) {
-    return fallback;
-  }
-
-  try {
-    return JSON.parse(value) as T;
-  } catch {
-    return fallback;
-  }
-}
-
 function stripHtml(value: string) {
   return value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 }
@@ -136,14 +122,37 @@ export default function Home() {
   const [blogs, setBlogs] = useState<BlogPost[]>(staticBlogs);
   const [properties, setProperties] = useState<PropertyListing[]>(staticProperties);
   const [searchFilters, setSearchFilters] = useState<SearchFilterConfig[]>(defaultSearchFilters);
+  const [siteSettings, setSiteSettings] = useState<SiteSettings>({
+    googleFormUrl: process.env.NEXT_PUBLIC_GOOGLE_FORM_URL ?? ""
+  });
   const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({});
   const [activeTab, setActiveTab] = useState<"For Sale" | "For Rent">("For Sale");
 
   useEffect(() => {
-    setSearchFilters(readStoredJson(filterStorageKey, defaultSearchFilters));
-    setProperties(readStoredJson(propertyStorageKey, staticProperties));
-    setBlogs(readStoredJson(blogStorageKey, staticBlogs));
+    void (async () => {
+      try {
+        const response = await fetch("/api/site-data", { cache: "no-store" });
+        const payload = (await response.json()) as {
+          blogs: BlogPost[];
+          properties: PropertyListing[];
+          filters: SearchFilterConfig[];
+          settings: SiteSettings;
+        };
+
+        setSearchFilters(payload.filters);
+        setProperties(payload.properties);
+        setBlogs(payload.blogs);
+        setSiteSettings(payload.settings);
+      } catch {
+        setSearchFilters(defaultSearchFilters);
+        setProperties(staticProperties);
+        setBlogs(staticBlogs);
+      }
+    })();
   }, []);
+
+  const googleFormHref = siteSettings.googleFormUrl.trim() || "#contact";
+  const opensExternalGoogleForm = googleFormHref.startsWith("http");
 
   const filteredProperties = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -288,14 +297,19 @@ export default function Home() {
                 match your budget, location, and timeline.
               </p>
             </div>
-            <a href={googleFormHref} className="google-form-button">
+            <a
+              href={googleFormHref}
+              className="google-form-button"
+              target={opensExternalGoogleForm ? "_blank" : undefined}
+              rel={opensExternalGoogleForm ? "noreferrer" : undefined}
+            >
               Contact Us Through Google Form
             </a>
           </div>
         </div>
       </section>
 
-      <section className="excellence-section section-shell">
+      <section className="excellence-section section-shell" id="about">
         <div className="section-intro centered">
           <h2>10 Years Of Excellence</h2>
           <span className="section-line" />
@@ -306,7 +320,7 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="services-grid">
+        <div className="services-grid" id="services">
           {serviceCards.map((service) => (
             <article key={service.title} className="service-card">
               <div className="service-icon">{service.icon}</div>
@@ -516,7 +530,12 @@ export default function Home() {
               <li>Priority Marketing</li>
               <li>Increased likelihood of renting / selling</li>
             </ul>
-            <a href="#" className="contact-experts-button">
+            <a
+              href={googleFormHref}
+              className="contact-experts-button"
+              target={opensExternalGoogleForm ? "_blank" : undefined}
+              rel={opensExternalGoogleForm ? "noreferrer" : undefined}
+            >
               Contact The Experts! →
             </a>
           </div>
@@ -524,14 +543,33 @@ export default function Home() {
 
       </section>
 
-      <footer className="site-footer">
+      <section className="section-shell" id="careers" style={{ paddingTop: 0 }}>
+        <div className="section-header">
+          <p className="section-kicker">Careers</p>
+          <p className="section-subtitle">Grow with Fairhaven</p>
+        </div>
+        <div
+          style={{
+            marginTop: "2rem",
+            border: "1px solid #1a2942",
+            background: "#0a1629",
+            padding: "2rem"
+          }}
+        >
+          <p style={{ color: "#cbd5e1", lineHeight: "1.7", margin: 0 }}>
+            We are always open to meeting strong real estate, operations, and client service talent in Ghana.
+          </p>
+        </div>
+      </section>
+
+      <footer className="site-footer" id="contact">
         <div className="footer-main section-shell">
           <div className="footer-col">
             <h3>Quick Links</h3>
             <div className="footer-links">
               {footerLinks.map((link) => (
-                <a href="#" key={link}>
-                  {link}
+                <a href={link.href} key={link.label}>
+                  {link.label}
                 </a>
               ))}
             </div>

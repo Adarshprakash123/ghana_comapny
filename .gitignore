@@ -17,6 +17,11 @@ pnpm-debug.log*
 .env.development.local
 .env.test.local
 .env.production.local
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
 
 # macOS
 .DS_Store
@@ -24,5 +29,3 @@ pnpm-debug.log*
 # TypeScript
 *.tsbuildinfo
 
-# Nested repo metadata
-frontend/.git/

@@ -41,6 +41,10 @@ export type BlogPost = {
   createdAt: string;
 };
 
+export type SiteSettings = {
+  googleFormUrl: string;
+};
+
 export const propertyStorageKey = "fairhaven-admin-properties";
 export const filterStorageKey = "fairhaven-admin-search-filters";
 export const blogStorageKey = "fairhaven-admin-blogs";
