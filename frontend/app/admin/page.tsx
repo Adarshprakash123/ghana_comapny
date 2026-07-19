@@ -21,7 +21,7 @@ type QuillInstance = {
 };
 
 type QuillConstructor = new (
-  selector: string,
+  container: string | HTMLElement,
   options: Record<string, unknown>
 ) => QuillInstance;
 
@@ -44,7 +44,8 @@ const emptyPropertyForm: PropertyForm = {
   beds: "3 Bedrooms",
   baths: "3 Bathrooms",
   parking: "1 Parking Spaces",
-  image: ""
+  image: "",
+  images: []
 };
 
 function slugify(value: string) {
@@ -86,6 +87,7 @@ export default function AdminPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [uploadingTarget, setUploadingTarget] = useState<UploadTarget>(null);
   const quillRef = useRef<QuillInstance | null>(null);
+  const editorContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const existingQuill = (window as unknown as { Quill?: QuillConstructor }).Quill;
@@ -108,7 +110,12 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => {
-    if (!quillReady || quillRef.current || activeSection !== "blog" || !isAuthenticated) {
+    if (!quillReady || activeSection !== "blog" || !isAuthenticated) {
+      return;
+    }
+
+    const container = editorContainerRef.current ?? document.getElementById("blog-quill-editor");
+    if (!container || quillRef.current) {
       return;
     }
 
@@ -117,7 +124,9 @@ export default function AdminPage() {
       return;
     }
 
-    quillRef.current = new Quill("#blog-quill-editor", {
+    container.innerHTML = "";
+
+    const instance = new Quill(container, {
       theme: "snow",
       placeholder: "Write the blog content here...",
       modules: {
@@ -130,9 +139,20 @@ export default function AdminPage() {
         ]
       }
     });
-    quillRef.current.on("text-change", () => {
-      setBlogContent(quillRef.current?.root.innerHTML ?? "");
+
+    if (blogContent) {
+      instance.root.innerHTML = blogContent;
+    }
+
+    instance.on("text-change", () => {
+      setBlogContent(instance.root.innerHTML ?? "");
     });
+
+    quillRef.current = instance;
+
+    return () => {
+      quillRef.current = null;
+    };
   }, [activeSection, isAuthenticated, quillReady]);
 
   useEffect(() => {
@@ -292,6 +312,65 @@ export default function AdminPage() {
       setStatusMessage("Image uploaded successfully.");
     } catch {
       setStatusMessage("Could not upload the image.");
+    } finally {
+      setUploadingTarget(null);
+    }
+  }
+
+  async function handleUploadMultipleImages(files: File[], target: Exclude<UploadTarget, null>) {
+    setUploadingTarget(target);
+    setStatusMessage(`Uploading ${files.length} ${target} image(s)...`);
+
+    try {
+      const uploadedUrls: string[] = [];
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const formData = new FormData();
+        const derivedFileName =
+          target === "blog"
+            ? `${blogSlug.trim() || slugify(blogTitle) || "blog-cover"}-${Date.now()}-${i}`
+            : `${slugify(propertyForm.title) || "property-image"}-${Date.now()}-${i}`;
+
+        formData.append("file", file);
+        formData.append("fileName", derivedFileName);
+        formData.append("folder", target === "blog" ? "/blogs" : "/properties");
+        formData.append("tags", target === "blog" ? "blog,cover" : "property,listing");
+        formData.append("useUniqueFileName", "true");
+
+        const response = await fetch("/api/admin/uploads", {
+          method: "POST",
+          body: formData
+        });
+        const payload = await readJson<{ imageUrl?: string; error?: string }>(response);
+
+        if (response.ok && payload.imageUrl) {
+          uploadedUrls.push(payload.imageUrl);
+        }
+      }
+
+      if (uploadedUrls.length === 0) {
+        setStatusMessage("Image upload failed.");
+        return;
+      }
+
+      if (target === "blog") {
+        setBlogCoverImage(uploadedUrls[0]);
+      } else {
+        setPropertyForm((current) => {
+          const currentImages = current.images ?? (current.image ? [current.image] : []);
+          const nextImages = [...currentImages, ...uploadedUrls];
+          return {
+            ...current,
+            images: nextImages,
+            image: current.image || nextImages[0] || ""
+          };
+        });
+      }
+
+      setStatusMessage(`Successfully uploaded ${uploadedUrls.length} image(s).`);
+    } catch {
+      setStatusMessage("Could not upload the images.");
     } finally {
       setUploadingTarget(null);
     }
@@ -718,7 +797,7 @@ export default function AdminPage() {
                     placeholder="Quill CDN did not load. Write HTML/plain content here."
                   />
                 ) : (
-                  <div id="blog-quill-editor" className="blog-quill-editor" />
+                  <div id="blog-quill-editor" ref={editorContainerRef} className="blog-quill-editor" />
                 )}
               </div>
 
@@ -860,23 +939,114 @@ export default function AdminPage() {
               </div>
 
               <label>
-                Uploaded Image URL
-                <input type="text" value={propertyForm.image} readOnly placeholder="Upload an image below" />
-              </label>
-              <label>
-                Upload Property Image
+                Upload Property Images (Select Multiple)
                 <input
                   type="file"
                   accept="image/*"
+                  multiple
                   onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) {
-                      void handleUploadImage(file, "property");
+                    const files = Array.from(event.target.files ?? []);
+                    if (files.length > 0) {
+                      void handleUploadMultipleImages(files, "property");
                     }
                     event.currentTarget.value = "";
                   }}
                 />
               </label>
+
+              {(propertyForm.images && propertyForm.images.length > 0) ? (
+                <div className="admin-uploaded-images-preview" style={{ marginBottom: "1rem" }}>
+                  <span style={{ fontSize: "0.85rem", color: "#8b94a5", fontWeight: 600 }}>
+                    Uploaded Property Images ({propertyForm.images.length})
+                  </span>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))",
+                      gap: "0.75rem",
+                      marginTop: "0.5rem"
+                    }}
+                  >
+                    {propertyForm.images.map((imgUrl, idx) => {
+                      const isCover = imgUrl === propertyForm.image;
+                      return (
+                        <div
+                          key={idx}
+                          style={{
+                            position: "relative",
+                            border: isCover ? "2px solid #d2b48c" : "1px solid #1a2942",
+                            borderRadius: "4px",
+                            overflow: "hidden",
+                            background: "#0a1629",
+                            padding: "0.25rem",
+                            display: "flex",
+                            flexDirection: "column"
+                          }}
+                        >
+                          <img
+                            src={imgUrl}
+                            alt={`Uploaded property image ${idx + 1}`}
+                            style={{ width: "100%", height: "75px", objectFit: "cover", borderRadius: "2px" }}
+                          />
+                          <div style={{ display: "flex", gap: "0.25rem", marginTop: "0.35rem" }}>
+                            <button
+                              type="button"
+                              onClick={() => updatePropertyField("image", imgUrl)}
+                              style={{
+                                flex: 1,
+                                fontSize: "0.65rem",
+                                padding: "0.25rem 0.1rem",
+                                background: isCover ? "#d2b48c" : "#1a2942",
+                                color: isCover ? "#081222" : "#fff",
+                                border: "none",
+                                borderRadius: "2px",
+                                cursor: "pointer",
+                                fontWeight: "bold"
+                              }}
+                            >
+                              {isCover ? "★ Cover" : "Set Cover"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nextImages = (propertyForm.images || []).filter((_, i) => i !== idx);
+                                setPropertyForm((prev) => ({
+                                  ...prev,
+                                  images: nextImages,
+                                  image: prev.image === imgUrl ? nextImages[0] || "" : prev.image
+                                }));
+                              }}
+                              style={{
+                                fontSize: "0.65rem",
+                                padding: "0.25rem 0.4rem",
+                                background: "#7f1d1d",
+                                color: "#fff",
+                                border: "none",
+                                borderRadius: "2px",
+                                cursor: "pointer"
+                              }}
+                              title="Delete image"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : propertyForm.image ? (
+                <div style={{ marginBottom: "1rem" }}>
+                  <span style={{ fontSize: "0.85rem", color: "#8b94a5", display: "block", marginBottom: "0.25rem" }}>
+                    Cover Image
+                  </span>
+                  <img
+                    src={propertyForm.image}
+                    alt="Cover image"
+                    style={{ width: "120px", height: "80px", objectFit: "cover", borderRadius: "4px", border: "1px solid #1a2942" }}
+                  />
+                </div>
+              ) : null}
               <label>
                 Description
                 <textarea

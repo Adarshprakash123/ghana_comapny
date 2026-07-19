@@ -280,25 +280,42 @@ export default async function PropertyPage({
         <span className="mini-line" style={{ marginBottom: "2.5rem", display: "block" }} />
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "1.5rem" }}>
-          <div
-            style={{
-              height: "250px",
-              background: `url(${property.image}) center/cover`,
-              opacity: 0.9,
-              transition: "opacity 0.3s"
-            }}
-          />
-          {dummyImages.map((src, index) => (
-            <div
-              key={index}
-              style={{
-                height: "250px",
-                background: `url(${src}) center/cover`,
-                opacity: 0.9,
-                transition: "opacity 0.3s"
-              }}
-            />
-          ))}
+          {property.images && property.images.length > 0 ? (
+            property.images.map((src, index) => (
+              <div
+                key={index}
+                style={{
+                  height: "250px",
+                  background: `url(${src}) center/cover`,
+                  borderRadius: "4px",
+                  opacity: 0.9,
+                  transition: "opacity 0.3s"
+                }}
+              />
+            ))
+          ) : (
+            <>
+              <div
+                style={{
+                  height: "250px",
+                  background: `url(${property.image}) center/cover`,
+                  opacity: 0.9,
+                  transition: "opacity 0.3s"
+                }}
+              />
+              {dummyImages.map((src, index) => (
+                <div
+                  key={index}
+                  style={{
+                    height: "250px",
+                    background: `url(${src}) center/cover`,
+                    opacity: 0.9,
+                    transition: "opacity 0.3s"
+                  }}
+                />
+              ))}
+            </>
+          )}
         </div>
       </section>
 

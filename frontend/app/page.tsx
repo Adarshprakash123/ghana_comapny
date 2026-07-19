@@ -224,6 +224,41 @@ export default function Home() {
     }));
   }
 
+  function handleDropdownClick(category: string, option: string) {
+    if (category === "Our Services") {
+      if (option === "Sales") {
+        setActiveTab("For Sale");
+        setHasSearched(false);
+        const propertiesEl = document.getElementById("properties");
+        if (propertiesEl) {
+          propertiesEl.scrollIntoView({ behavior: "smooth" });
+        }
+        return;
+      }
+    }
+
+    if (category === "Properties") {
+      if (option === "Rent" || option === "For Rent") {
+        setActiveTab("For Rent");
+        setHasSearched(false);
+        const propertiesEl = document.getElementById("properties");
+        if (propertiesEl) {
+          propertiesEl.scrollIntoView({ behavior: "smooth" });
+        }
+        return;
+      }
+      if (option === "Sale" || option === "For Sale") {
+        setActiveTab("For Sale");
+        setHasSearched(false);
+        const propertiesEl = document.getElementById("properties");
+        if (propertiesEl) {
+          propertiesEl.scrollIntoView({ behavior: "smooth" });
+        }
+        return;
+      }
+    }
+  }
+
   return (
     <main className="akka-page">
       <section className="hero">
@@ -251,11 +286,37 @@ export default function Home() {
                 </a>
                 {item.dropdown && (
                   <div className="nav-dropdown" role="menu" aria-label={item.label}>
-                    {item.dropdown.map((option) => (
-                      <a href="#" key={option} className="nav-dropdown-link" role="menuitem">
-                        {option}
-                      </a>
-                    ))}
+                    {item.dropdown.map((option) => {
+                      const isTabScroll =
+                        (item.label === "Our Services" && option === "Sales") ||
+                        (item.label === "Properties" && (option === "Rent" || option === "Sale"));
+
+                      let href = "#properties";
+                      if (item.label === "Our Services") {
+                        if (option === "Property Management") {
+                          href = `/blog/${blogs[0]?.slug || "hodnocjw"}`;
+                        } else if (option === "Relocation Management") {
+                          href = `/blog/${blogs[1]?.slug || blogs[0]?.slug || "jfwek"}`;
+                        }
+                      }
+
+                      return (
+                        <a
+                          href={href}
+                          key={option}
+                          className="nav-dropdown-link"
+                          role="menuitem"
+                          onClick={(e) => {
+                            if (isTabScroll) {
+                              e.preventDefault();
+                              handleDropdownClick(item.label, option);
+                            }
+                          }}
+                        >
+                          {option}
+                        </a>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -577,12 +638,12 @@ export default function Home() {
 
           <div className="footer-col footer-contact">
             <h3>Contact Us</h3>
-            <p>31 Nortei Ababio Street</p>
-            <p>Airport Residential Area</p>
-            <p>Accra</p>
-            <p className="footer-gap">Ghana Post GPS: GA-117-9018</p>
-            <p>+233 (0) 540 122 800</p>
-            <p>info@akkakappaghana.com</p>
+            <p>No C95</p>
+            <p>Rosewood Street</p>
+            <p>Tseaddo, Accra</p>
+            {/* <p className="footer-gap">Ghana Post GPS: GA-117-9018</p> */}
+            <p>+233547008503</p>
+            <p>fairhavenmail@gmail.com</p>
           </div>
 
           <div className="footer-col">
@@ -599,7 +660,7 @@ export default function Home() {
 
         <div className="footer-bottom">
           <p>© 2026 Fairhaven LTD. ALL RIGHTS RESERVED. | TERMS & PRIVACY</p>
-          <p>DESIGNED & DEVELOPED BY Raghu Technologies</p>
+          {/* <p>DESIGNED & DEVELOPED BY Raghu Technologies</p> */}
         </div>
       </footer>
     </main>

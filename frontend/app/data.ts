@@ -29,6 +29,7 @@ export type PropertyListing = {
   baths: string;
   parking: string;
   image: string;
+  images?: string[];
 };
 
 export type BlogPost = {
