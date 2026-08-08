@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { compressImageForUpload } from "@/lib/client/compress-image";
 import {
   defaultSearchFilters,
   type BlogPost,
@@ -58,6 +59,14 @@ function slugify(value: string) {
 
 async function readJson<T>(response: Response) {
   return (await response.json()) as T;
+}
+
+function getUploadErrorMessage(response: Response, payload: { error?: string }) {
+  if (response.status === 413) {
+    return "Image is too large for the server. Try a smaller file or compress it before uploading.";
+  }
+
+  return payload.error ?? "Image upload failed.";
 }
 
 export default function AdminPage() {
@@ -280,13 +289,14 @@ export default function AdminPage() {
     setStatusMessage(`Uploading ${target} image...`);
 
     try {
+      const uploadFile = await compressImageForUpload(file);
       const formData = new FormData();
       const derivedFileName =
         target === "blog"
           ? `${blogSlug.trim() || slugify(blogTitle) || "blog-cover"}-${Date.now()}`
           : `${slugify(propertyForm.title) || "property-image"}-${Date.now()}`;
 
-      formData.append("file", file);
+      formData.append("file", uploadFile);
       formData.append("fileName", derivedFileName);
       formData.append("folder", target === "blog" ? "/blogs" : "/properties");
       formData.append("tags", target === "blog" ? "blog,cover" : "property,listing");
@@ -299,14 +309,18 @@ export default function AdminPage() {
       const payload = await readJson<{ imageUrl?: string; error?: string }>(response);
 
       if (!response.ok || !payload.imageUrl) {
-        setStatusMessage(payload.error ?? "Image upload failed.");
+        setStatusMessage(getUploadErrorMessage(response, payload));
         return;
       }
 
       if (target === "blog") {
         setBlogCoverImage(payload.imageUrl);
       } else {
-        updatePropertyField("image", payload.imageUrl);
+        setPropertyForm((current) => ({
+          ...current,
+          image: payload.imageUrl ?? "",
+          images: payload.imageUrl ? [payload.imageUrl] : []
+        }));
       }
 
       setStatusMessage("Image uploaded successfully.");
@@ -323,16 +337,18 @@ export default function AdminPage() {
 
     try {
       const uploadedUrls: string[] = [];
+      let lastError = "";
 
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
+        const uploadFile = await compressImageForUpload(file);
         const formData = new FormData();
         const derivedFileName =
           target === "blog"
             ? `${blogSlug.trim() || slugify(blogTitle) || "blog-cover"}-${Date.now()}-${i}`
             : `${slugify(propertyForm.title) || "property-image"}-${Date.now()}-${i}`;
 
-        formData.append("file", file);
+        formData.append("file", uploadFile);
         formData.append("fileName", derivedFileName);
         formData.append("folder", target === "blog" ? "/blogs" : "/properties");
         formData.append("tags", target === "blog" ? "blog,cover" : "property,listing");
@@ -346,29 +362,31 @@ export default function AdminPage() {
 
         if (response.ok && payload.imageUrl) {
           uploadedUrls.push(payload.imageUrl);
+        } else {
+          lastError = getUploadErrorMessage(response, payload);
         }
       }
 
       if (uploadedUrls.length === 0) {
-        setStatusMessage("Image upload failed.");
+        setStatusMessage(lastError || "Image upload failed.");
         return;
       }
 
       if (target === "blog") {
         setBlogCoverImage(uploadedUrls[0]);
       } else {
-        setPropertyForm((current) => {
-          const currentImages = current.images ?? (current.image ? [current.image] : []);
-          const nextImages = [...currentImages, ...uploadedUrls];
-          return {
-            ...current,
-            images: nextImages,
-            image: current.image || nextImages[0] || ""
-          };
-        });
+        setPropertyForm((current) => ({
+          ...current,
+          images: uploadedUrls,
+          image: uploadedUrls[0] ?? ""
+        }));
       }
 
-      setStatusMessage(`Successfully uploaded ${uploadedUrls.length} image(s).`);
+      setStatusMessage(
+        uploadedUrls.length === files.length
+          ? `Successfully uploaded ${uploadedUrls.length} image(s).`
+          : `Uploaded ${uploadedUrls.length} of ${files.length} image(s). ${lastError}`
+      );
     } catch {
       setStatusMessage("Could not upload the images.");
     } finally {
