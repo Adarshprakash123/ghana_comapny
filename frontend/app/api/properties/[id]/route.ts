@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { PropertyListing } from "@/app/data";
 import { readAdminSessionFromRequest } from "@/lib/server/admin-auth";
 import { readProperties, writeProperties } from "@/lib/server/content-store";
+import { normalizePropertyImages } from "@/lib/server/property-images";
 
 export const runtime = "nodejs";
 
@@ -43,6 +44,11 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: "Property not found." }, { status: 404 });
   }
 
+  const { image, images } = normalizePropertyImages({
+    image: payload.image ?? properties[index].image,
+    images: payload.images ?? properties[index].images
+  });
+
   const updatedProperty: PropertyListing = {
     ...properties[index],
     title,
@@ -59,7 +65,8 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     beds: payload.beds?.trim() ?? properties[index].beds,
     baths: payload.baths?.trim() ?? properties[index].baths,
     parking: payload.parking?.trim() ?? properties[index].parking,
-    image: payload.image?.trim() ?? properties[index].image
+    image,
+    images
   };
 
   properties[index] = updatedProperty;

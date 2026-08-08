@@ -2,17 +2,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { readProperties, readSiteSettings } from "@/lib/server/content-store";
+import { getPropertyGalleryImages } from "@/lib/server/property-images";
 
 export const dynamic = "force-dynamic";
-
-const dummyImages = [
-  "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1600607688969-a5bfcd64bd9b?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1600566752355-35792bedcfea?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=1200&q=80"
-];
 
 export default async function PropertyPage({
   params
@@ -28,6 +20,8 @@ export default async function PropertyPage({
   if (!property) {
     notFound();
   }
+
+  const galleryImages = getPropertyGalleryImages(property);
 
   return (
     <main className="akka-page">
@@ -279,11 +273,11 @@ export default async function PropertyPage({
         </h2>
         <span className="mini-line" style={{ marginBottom: "2.5rem", display: "block" }} />
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "1.5rem" }}>
-          {property.images && property.images.length > 0 ? (
-            property.images.map((src, index) => (
+        {galleryImages.length > 0 ? (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "1.5rem" }}>
+            {galleryImages.map((src, index) => (
               <div
-                key={index}
+                key={`${src}-${index}`}
                 style={{
                   height: "250px",
                   background: `url(${src}) center/cover`,
@@ -292,31 +286,11 @@ export default async function PropertyPage({
                   transition: "opacity 0.3s"
                 }}
               />
-            ))
-          ) : (
-            <>
-              <div
-                style={{
-                  height: "250px",
-                  background: `url(${property.image}) center/cover`,
-                  opacity: 0.9,
-                  transition: "opacity 0.3s"
-                }}
-              />
-              {dummyImages.map((src, index) => (
-                <div
-                  key={index}
-                  style={{
-                    height: "250px",
-                    background: `url(${src}) center/cover`,
-                    opacity: 0.9,
-                    transition: "opacity 0.3s"
-                  }}
-                />
-              ))}
-            </>
-          )}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <p style={{ color: "#8b94a5" }}>No gallery images uploaded for this property yet.</p>
+        )}
       </section>
 
       <footer className="site-footer">

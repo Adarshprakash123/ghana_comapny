@@ -2,7 +2,6 @@ import { promises as fs } from "fs";
 import path from "path";
 import blogsData from "../../data/blogs.json";
 import {
-  defaultProperties,
   defaultSearchFilters,
   type BlogPost,
   type PropertyListing,
@@ -163,7 +162,7 @@ export async function writeBlogs(blogs: BlogPost[]) {
 }
 
 export async function readProperties() {
-  return readCollection<PropertyListing[]>("properties", propertiesFilePath, defaultProperties);
+  return readCollection<PropertyListing[]>("properties", propertiesFilePath, []);
 }
 
 export async function writeProperties(properties: PropertyListing[]) {

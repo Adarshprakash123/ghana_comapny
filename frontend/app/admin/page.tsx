@@ -57,8 +57,16 @@ function slugify(value: string) {
     .replace(/^-|-$/g, "");
 }
 
-async function readJson<T>(response: Response) {
-  return (await response.json()) as T;
+async function readJson<T>(response: Response): Promise<T> {
+  try {
+    return (await response.json()) as T;
+  } catch {
+    return {} as T;
+  }
+}
+
+function buildUploadFileName(baseName: string, index: number) {
+  return `${baseName}-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function getUploadErrorMessage(response: Response, payload: { error?: string }) {
@@ -293,8 +301,8 @@ export default function AdminPage() {
       const formData = new FormData();
       const derivedFileName =
         target === "blog"
-          ? `${blogSlug.trim() || slugify(blogTitle) || "blog-cover"}-${Date.now()}`
-          : `${slugify(propertyForm.title) || "property-image"}-${Date.now()}`;
+          ? buildUploadFileName(blogSlug.trim() || slugify(blogTitle) || "blog-cover", 0)
+          : buildUploadFileName(slugify(propertyForm.title) || "property-image", 0);
 
       formData.append("file", uploadFile);
       formData.append("fileName", derivedFileName);
@@ -345,8 +353,8 @@ export default function AdminPage() {
         const formData = new FormData();
         const derivedFileName =
           target === "blog"
-            ? `${blogSlug.trim() || slugify(blogTitle) || "blog-cover"}-${Date.now()}-${i}`
-            : `${slugify(propertyForm.title) || "property-image"}-${Date.now()}-${i}`;
+            ? buildUploadFileName(blogSlug.trim() || slugify(blogTitle) || "blog-cover", i)
+            : buildUploadFileName(slugify(propertyForm.title) || "property-image", i);
 
         formData.append("file", uploadFile);
         formData.append("fileName", derivedFileName);
@@ -362,6 +370,14 @@ export default function AdminPage() {
 
         if (response.ok && payload.imageUrl) {
           uploadedUrls.push(payload.imageUrl);
+
+          if (target === "property") {
+            setPropertyForm((current) => ({
+              ...current,
+              images: [...uploadedUrls],
+              image: uploadedUrls[0] ?? ""
+            }));
+          }
         } else {
           lastError = getUploadErrorMessage(response, payload);
         }
@@ -989,7 +1005,7 @@ export default function AdminPage() {
                       const isCover = imgUrl === propertyForm.image;
                       return (
                         <div
-                          key={idx}
+                          key={imgUrl}
                           style={{
                             position: "relative",
                             border: isCover ? "2px solid #d2b48c" : "1px solid #1a2942",

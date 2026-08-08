@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { PropertyListing } from "@/app/data";
 import { readAdminSessionFromRequest } from "@/lib/server/admin-auth";
 import { readProperties, slugify, writeProperties } from "@/lib/server/content-store";
+import { normalizePropertyImages } from "@/lib/server/property-images";
 
 export const runtime = "nodejs";
 
@@ -24,6 +25,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Title is required." }, { status: 400 });
   }
 
+  const { image, images } = normalizePropertyImages(payload);
+
   const property: PropertyListing = {
     id: `${slugify(title)}-${Date.now()}`,
     title,
@@ -37,7 +40,8 @@ export async function POST(request: NextRequest) {
     beds: payload.beds?.trim() ?? "3 Bedrooms",
     baths: payload.baths?.trim() ?? "3 Bathrooms",
     parking: payload.parking?.trim() ?? "1 Parking Space",
-    image: payload.image?.trim() ?? ""
+    image,
+    images
   };
 
   const properties = [property, ...(await readProperties())];

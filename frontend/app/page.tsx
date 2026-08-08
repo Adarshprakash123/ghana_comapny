@@ -9,7 +9,7 @@ import {
   type SearchFilterConfig,
   type SiteSettings
 } from "./data";
-import { staticBlogs, staticProperties } from "./static-content";
+import { staticBlogs } from "./static-content";
 
 const navItems = [
   { label: "Home", href: "#" },
@@ -27,6 +27,33 @@ const navItems = [
   { label: "Blog", href: "#blog" },
   { label: "Careers", href: "#careers" },
   { label: "Contact Us", href: "#contact" }
+];
+
+const whyChooseUs = [
+  {
+    title: "Trusted Expertise",
+    text: "Years of experience in Ghana's real estate market"
+  },
+  {
+    title: "Premium Properties",
+    text: "Carefully curated selection of high-quality homes and commercial spaces"
+  },
+  {
+    title: "Personalized Service",
+    text: "We listen to your needs and deliver tailored solutions"
+  },
+  {
+    title: "Professional Integrity",
+    text: "Honest, transparent dealings in every transaction"
+  },
+  {
+    title: "Convenient Process",
+    text: "Easy viewing bookings and smooth transaction management"
+  },
+  {
+    title: "Local Knowledge",
+    text: "Deep understanding of Accra's neighborhoods and market trends"
+  }
 ];
 
 const serviceCards = [
@@ -120,7 +147,7 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
   const [blogs, setBlogs] = useState<BlogPost[]>(staticBlogs);
-  const [properties, setProperties] = useState<PropertyListing[]>(staticProperties);
+  const [properties, setProperties] = useState<PropertyListing[]>([]);
   const [searchFilters, setSearchFilters] = useState<SearchFilterConfig[]>(defaultSearchFilters);
   const [siteSettings, setSiteSettings] = useState<SiteSettings>({
     googleFormUrl: process.env.NEXT_PUBLIC_GOOGLE_FORM_URL ?? ""
@@ -145,7 +172,7 @@ export default function Home() {
         setSiteSettings(payload.settings);
       } catch {
         setSearchFilters(defaultSearchFilters);
-        setProperties(staticProperties);
+        setProperties([]);
         setBlogs(staticBlogs);
       }
     })();
@@ -371,14 +398,68 @@ export default function Home() {
       </section>
 
       <section className="excellence-section section-shell" id="about">
-        <div className="section-intro centered">
-          <h2>10 Years Of Excellence</h2>
+        <div className="about-header">
+          <p className="section-kicker">About Us</p>
+          <h2>
+            About <span className="about-brand">Fairhaven Properties</span>
+          </h2>
           <span className="section-line" />
-          <p>
-            This year is especially meaningful as it marks our 10th anniversary, a decade of serving
-            Ghana&apos;s real estate needs with dedication, professionalism, and a relentless drive for
-            excellence.
-          </p>
+          <p className="about-tagline">Your Trusted Partner in Real Estate Excellence</p>
+        </div>
+
+        <div className="about-layout">
+          <div className="about-copy">
+            <p>
+              Welcome to <strong>Fairhaven Properties</strong>, your premier real estate partner in
+              Accra, Ghana. We are a trusted and dedicated real estate company committed to providing
+              exceptional services to clients looking to buy, sell, or rent properties across
+              Ghana&apos;s most sought-after locations.
+            </p>
+            <p>
+              At <strong>Fairhaven Properties</strong>, we understand that finding the perfect property
+              is more than just a transaction—it&apos;s about finding a place to call home, a space to
+              grow your business, or an investment that secures your future. That&apos;s why we go above
+              and beyond to ensure every client receives personalized attention, professional guidance,
+              and access to premium properties that match their unique needs and aspirations.
+            </p>
+            <p>
+              Our team of experienced real estate professionals brings extensive knowledge of the Accra
+              property market, from the prestigious neighborhoods of East Legon, Tseaddo, Airport
+              Residential, Cantonments to emerging areas with great investment potential. We pride
+              ourselves on our integrity, transparency, and commitment to excellence in every aspect of
+              our service.
+            </p>
+            <p>
+              Whether you&apos;re a first-time homebuyer, a seasoned investor, or someone looking to rent
+              a comfortable space, <strong>Fairhaven Properties</strong> is here to guide you every step
+              of the way. We offer comprehensive property listings, expert market insights, convenient
+              viewing arrangements, and dedicated support to make your real estate journey smooth and
+              successful.
+            </p>
+            <p className="about-closing">
+              At <strong>Fairhaven Properties</strong>, your satisfaction is our priority. We are ready to
+              serve you with dedication, professionalism, and the highest standards of real estate
+              service. Let us help you find your dream property or achieve your real estate investment
+              goals.
+            </p>
+          </div>
+
+          <aside className="about-highlights">
+            <h3>Why Choose Us?</h3>
+            <ul className="about-benefits">
+              {whyChooseUs.map((item) => (
+                <li key={item.title}>
+                  <span className="about-benefit-icon" aria-hidden="true">
+                    ✓
+                  </span>
+                  <div>
+                    <strong>{item.title}</strong>
+                    <p>{item.text}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </aside>
         </div>
 
         <div className="services-grid" id="services">

@@ -538,6 +538,123 @@ select {
   padding: 82px 0 40px;
 }
 
+.about-header {
+  max-width: 920px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.about-header h2 {
+  margin: 0;
+  color: var(--blue-soft);
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.about-brand {
+  color: var(--navy);
+  font-weight: 600;
+}
+
+.about-tagline {
+  margin: 18px auto 0;
+  max-width: 760px;
+  color: var(--navy);
+  font-size: clamp(1.1rem, 2vw, 1.35rem);
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.about-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.85fr);
+  gap: 36px;
+  align-items: start;
+  margin-top: 56px;
+}
+
+.about-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.about-copy p {
+  margin: 0;
+  color: #66839c;
+  font-size: 1.02rem;
+  line-height: 1.85;
+}
+
+.about-copy strong {
+  color: var(--navy);
+  font-weight: 600;
+}
+
+.about-closing {
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--line);
+}
+
+.about-highlights {
+  padding: 28px 26px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  box-shadow: 0 18px 40px rgba(24, 50, 86, 0.06);
+}
+
+.about-highlights h3 {
+  margin: 0 0 22px;
+  color: var(--gold);
+  font-size: 1.35rem;
+  font-weight: 600;
+}
+
+.about-benefits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.about-benefits li {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.about-benefit-icon {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(228, 166, 26, 0.14);
+  color: var(--gold);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.about-benefits strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--navy);
+  font-size: 0.98rem;
+  line-height: 1.35;
+}
+
+.about-benefits p {
+  margin: 0;
+  color: #7d93a8;
+  font-size: 0.94rem;
+  line-height: 1.65;
+}
+
 .section-intro.centered {
   max-width: 880px;
   margin: 0 auto;
@@ -1485,6 +1602,10 @@ select {
   .neighborhoods-grid,
   .blog-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .about-layout {
+    grid-template-columns: 1fr;
   }
 
   .partners-row {
