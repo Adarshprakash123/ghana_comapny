@@ -154,6 +154,11 @@ export default function Home() {
   });
   const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({});
   const [activeTab, setActiveTab] = useState<"For Sale" | "For Rent">("For Sale");
+  const [visibleCount, setVisibleCount] = useState(4);
+
+  useEffect(() => {
+    setVisibleCount(4);
+  }, [activeTab, hasSearched]);
 
   useEffect(() => {
     void (async () => {
@@ -214,7 +219,16 @@ export default function Home() {
     });
   }, [properties, query, selectedFilters]);
 
-  const displayedProperties = hasSearched ? filteredProperties : properties.filter((p) => p.status === activeTab).slice(0, 4);
+  const tabProperties = useMemo(() => {
+    return properties.filter((p) => p.status === activeTab);
+  }, [properties, activeTab]);
+
+  const displayedProperties = useMemo(() => {
+    if (hasSearched) {
+      return filteredProperties;
+    }
+    return tabProperties.slice(0, visibleCount);
+  }, [hasSearched, filteredProperties, tabProperties, visibleCount]);
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -561,6 +575,17 @@ export default function Home() {
           </div>
         )}
 
+        {!hasSearched && tabProperties.length > visibleCount && (
+          <div className="view-more-wrap">
+            <button
+              type="button"
+              className="view-more-button"
+              onClick={() => setVisibleCount((prev) => prev + 4)}
+            >
+              Load More
+            </button>
+          </div>
+        )}
 
       </section>
 
