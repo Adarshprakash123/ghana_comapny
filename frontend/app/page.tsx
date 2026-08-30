@@ -155,6 +155,14 @@ export default function Home() {
   const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({});
   const [activeTab, setActiveTab] = useState<"For Sale" | "For Rent">("For Sale");
   const [visibleCount, setVisibleCount] = useState(4);
+  const [blogCurrentPage, setBlogCurrentPage] = useState(1);
+  const BLOGS_PER_PAGE = 3;
+
+  const totalBlogPages = Math.ceil(blogs.length / BLOGS_PER_PAGE);
+  const paginatedBlogs = useMemo(() => {
+    const start = (blogCurrentPage - 1) * BLOGS_PER_PAGE;
+    return blogs.slice(start, start + BLOGS_PER_PAGE);
+  }, [blogs, blogCurrentPage]);
 
   useEffect(() => {
     setVisibleCount(4);
@@ -597,7 +605,7 @@ export default function Home() {
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "2rem", marginTop: "2rem" }}>
-            {blogs.map((blog) => {
+            {paginatedBlogs.map((blog) => {
               const previewText = blog.excerpt || stripHtml(blog.content);
 
               return (
@@ -606,12 +614,15 @@ export default function Home() {
                   style={{
                     backgroundColor: "#0a1629",
                     border: "1px solid #1a2942",
-                    padding: "2rem",
+                    padding: "0",
+                    overflow: "hidden",
                     display: "flex",
                     flexDirection: "column",
-                    gap: "1rem",
                     transition: "transform 0.2s ease, box-shadow 0.2s ease",
                     cursor: "pointer"
+                  }}
+                  onClick={() => {
+                    window.location.href = `/blog/${blog.slug}`;
                   }}
                   onMouseOver={(e) => {
                     e.currentTarget.style.transform = "translateY(-4px)";
@@ -622,63 +633,171 @@ export default function Home() {
                     e.currentTarget.style.boxShadow = "none";
                   }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ 
-                      background: "#d2b48c", 
-                      color: "#081222", 
-                      padding: "0.25rem 0.75rem",
-                      fontSize: "0.75rem",
-                      fontWeight: "bold",
-                      textTransform: "uppercase",
-                      letterSpacing: "1px"
-                    }}>
-                      Fairhaven Journal
-                    </span>
-                    <p style={{ color: "#8b94a5", fontSize: "0.9rem", margin: 0 }}>
-                      {new Date(blog.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                  
-                  <h3 style={{ 
-                    fontSize: "1.5rem", 
-                    color: "#fff", 
-                    fontFamily: "'Playfair Display', serif",
-                    margin: 0
-                  }}>
-                    {blog.title}
-                  </h3>
-                  
-                  <p style={{ 
-                    color: "#cbd5e1", 
-                    lineHeight: "1.6",
-                    display: "-webkit-box",
-                    WebkitLineClamp: 3,
-                    WebkitBoxOrient: "vertical",
+                  <div style={{
+                    width: "100%",
+                    height: "200px",
+                    position: "relative",
                     overflow: "hidden",
-                    margin: 0
+                    backgroundColor: "#060e1b"
                   }}>
-                    {previewText}
-                  </p>
-                  
-                  <a 
-                    href={`/blog/${blog.slug}`} 
-                    style={{ 
-                      color: "#d2b48c", 
-                      fontWeight: "bold", 
-                      textDecoration: "none",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "0.5rem",
-                      marginTop: "auto",
-                      paddingTop: "1rem"
-                    }}
-                  >
-                    Read Article <span aria-hidden="true">&rarr;</span>
-                  </a>
+                    {blog.coverImage ? (
+                      <img
+                        src={blog.coverImage}
+                        alt={blog.title}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover"
+                        }}
+                        onError={(e) => {
+                          e.currentTarget.src = "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80";
+                        }}
+                      />
+                    ) : (
+                      <div style={{
+                        width: "100%",
+                        height: "100%",
+                        background: "linear-gradient(135deg, #102743 0%, #060e1b 100%)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center"
+                      }}>
+                        <span style={{ color: "#d2b48c", fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "2px" }}>
+                          Fairhaven Blog
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ padding: "2rem", display: "flex", flexDirection: "column", gap: "1rem", flex: 1 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ 
+                        background: "#d2b48c", 
+                        color: "#081222", 
+                        padding: "0.25rem 0.75rem",
+                        fontSize: "0.75rem",
+                        fontWeight: "bold",
+                        textTransform: "uppercase",
+                        letterSpacing: "1px"
+                      }}>
+                        Fairhaven Journal
+                      </span>
+                      <p style={{ color: "#8b94a5", fontSize: "0.9rem", margin: 0 }}>
+                        {new Date(blog.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    
+                    <h3 style={{ 
+                      fontSize: "1.5rem", 
+                      color: "#fff", 
+                      fontFamily: "'Playfair Display', serif",
+                      margin: 0
+                    }}>
+                      {blog.title}
+                    </h3>
+                    
+                    <p style={{ 
+                      color: "#cbd5e1", 
+                      lineHeight: "1.6",
+                      display: "-webkit-box",
+                      WebkitLineClamp: 3,
+                      WebkitBoxOrient: "vertical",
+                      overflow: "hidden",
+                      margin: 0
+                    }}>
+                      {previewText}
+                    </p>
+                    
+                    <a 
+                      href={`/blog/${blog.slug}`} 
+                      style={{ 
+                        color: "#d2b48c", 
+                        fontWeight: "bold", 
+                        textDecoration: "none",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                        marginTop: "auto",
+                        paddingTop: "1rem"
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation(); // prevent duplicate navigation
+                      }}
+                    >
+                      Read Article <span aria-hidden="true">&rarr;</span>
+                    </a>
+                  </div>
                 </article>
               );
             })}
           </div>
+
+          {totalBlogPages > 1 && (
+            <div style={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              gap: "0.75rem",
+              marginTop: "3rem"
+            }}>
+              <button
+                type="button"
+                onClick={() => setBlogCurrentPage((prev) => Math.max(prev - 1, 1))}
+                disabled={blogCurrentPage === 1}
+                style={{
+                  background: blogCurrentPage === 1 ? "#0f1d33" : "#1a2942",
+                  color: blogCurrentPage === 1 ? "#4a5568" : "#d2b48c",
+                  border: "1px solid #1a2942",
+                  padding: "0.5rem 1rem",
+                  borderRadius: "4px",
+                  cursor: blogCurrentPage === 1 ? "not-allowed" : "pointer",
+                  fontWeight: "bold",
+                  transition: "all 0.2s ease"
+                }}
+              >
+                &larr; Previous
+              </button>
+
+              {Array.from({ length: totalBlogPages }, (_, idx) => idx + 1).map((pageNum) => (
+                <button
+                  key={pageNum}
+                  type="button"
+                  onClick={() => setBlogCurrentPage(pageNum)}
+                  style={{
+                    background: blogCurrentPage === pageNum ? "#d2b48c" : "#0a1629",
+                    color: blogCurrentPage === pageNum ? "#081222" : "#ffffff",
+                    border: "1px solid #1a2942",
+                    width: "36px",
+                    height: "36px",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                    transition: "all 0.2s ease"
+                  }}
+                >
+                  {pageNum}
+                </button>
+              ))}
+
+              <button
+                type="button"
+                onClick={() => setBlogCurrentPage((prev) => Math.min(prev + 1, totalBlogPages))}
+                disabled={blogCurrentPage === totalBlogPages}
+                style={{
+                  background: blogCurrentPage === totalBlogPages ? "#0f1d33" : "#1a2942",
+                  color: blogCurrentPage === totalBlogPages ? "#4a5568" : "#d2b48c",
+                  border: "1px solid #1a2942",
+                  padding: "0.5rem 1rem",
+                  borderRadius: "4px",
+                  cursor: blogCurrentPage === totalBlogPages ? "not-allowed" : "pointer",
+                  fontWeight: "bold",
+                  transition: "all 0.2s ease"
+                }}
+              >
+                Next &rarr;
+              </button>
+            </div>
+          )}
         </section>
       )}
 

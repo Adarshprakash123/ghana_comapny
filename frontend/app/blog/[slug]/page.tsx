@@ -100,6 +100,30 @@ export default async function BlogPage({
         className="section-shell"
         style={{ maxWidth: "800px", margin: "0 auto", padding: "4rem 2rem", background: "#081222" }}
       >
+        {blog.coverImage && (
+          <div
+            style={{
+              position: "relative",
+              width: "100%",
+              height: "450px",
+              marginBottom: "3rem",
+              borderRadius: "8px",
+              overflow: "hidden",
+              border: "1px solid #1a2942"
+            }}
+          >
+            <img
+              src={blog.coverImage}
+              alt={blog.title}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover"
+              }}
+            />
+          </div>
+        )}
+
         {blog.excerpt && (
           <div
             style={{
