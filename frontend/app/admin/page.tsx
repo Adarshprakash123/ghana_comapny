@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import QuillEditor from "@/components/QuillEditor";
 import { compressImageForUpload } from "@/lib/client/compress-image";
 import {
   defaultSearchFilters,
@@ -15,16 +16,6 @@ type AdminSection = "blog" | "api";
 type UploadTarget = "blog" | "property" | null;
 
 type PropertyForm = Omit<PropertyListing, "id">;
-
-type QuillInstance = {
-  root: HTMLElement;
-  on: (eventName: "text-change", handler: () => void) => void;
-};
-
-type QuillConstructor = new (
-  container: string | HTMLElement,
-  options: Record<string, unknown>
-) => QuillInstance;
 
 type SiteDataResponse = {
   blogs: BlogPost[];
@@ -79,8 +70,6 @@ function getUploadErrorMessage(response: Response, payload: { error?: string }) 
 
 export default function AdminPage() {
   const [activeSection, setActiveSection] = useState<AdminSection>("blog");
-  const [quillReady, setQuillReady] = useState(false);
-  const [quillFailed, setQuillFailed] = useState(false);
   const [sessionChecked, setSessionChecked] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authEmail, setAuthEmail] = useState("");
@@ -103,74 +92,6 @@ export default function AdminPage() {
   const [statusMessage, setStatusMessage] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [uploadingTarget, setUploadingTarget] = useState<UploadTarget>(null);
-  const quillRef = useRef<QuillInstance | null>(null);
-  const editorContainerRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    const existingQuill = (window as unknown as { Quill?: QuillConstructor }).Quill;
-    if (existingQuill) {
-      setQuillReady(true);
-      return;
-    }
-
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = "https://cdn.quilljs.com/1.3.7/quill.snow.css";
-    document.head.appendChild(link);
-
-    const script = document.createElement("script");
-    script.src = "https://cdn.quilljs.com/1.3.7/quill.min.js";
-    script.async = true;
-    script.onload = () => setQuillReady(true);
-    script.onerror = () => setQuillFailed(true);
-    document.body.appendChild(script);
-  }, []);
-
-  useEffect(() => {
-    if (!quillReady || activeSection !== "blog" || !isAuthenticated) {
-      return;
-    }
-
-    const container = editorContainerRef.current ?? document.getElementById("blog-quill-editor");
-    if (!container || quillRef.current) {
-      return;
-    }
-
-    const Quill = (window as unknown as { Quill?: QuillConstructor }).Quill;
-    if (!Quill) {
-      return;
-    }
-
-    container.innerHTML = "";
-
-    const instance = new Quill(container, {
-      theme: "snow",
-      placeholder: "Write the blog content here...",
-      modules: {
-        toolbar: [
-          [{ header: [1, 2, 3, false] }],
-          ["bold", "italic", "underline"],
-          [{ list: "ordered" }, { list: "bullet" }],
-          ["link", "blockquote"],
-          ["clean"]
-        ]
-      }
-    });
-
-    if (blogContent) {
-      instance.root.innerHTML = blogContent;
-    }
-
-    instance.on("text-change", () => {
-      setBlogContent(instance.root.innerHTML ?? "");
-    });
-
-    quillRef.current = instance;
-
-    return () => {
-      quillRef.current = null;
-    };
-  }, [activeSection, isAuthenticated, quillReady]);
 
   useEffect(() => {
     void initializeAdmin();
@@ -184,12 +105,6 @@ export default function AdminPage() {
       }
     }
   }, [filters, selectedFilter]);
-
-  useEffect(() => {
-    if (quillRef.current && quillRef.current.root.innerHTML !== blogContent) {
-      quillRef.current.root.innerHTML = blogContent;
-    }
-  }, [blogContent]);
 
   async function initializeAdmin() {
     try {
@@ -234,9 +149,6 @@ export default function AdminPage() {
     setBlogExcerpt("");
     setBlogCoverImage("");
     setBlogContent("");
-    if (quillRef.current) {
-      quillRef.current.root.innerHTML = "";
-    }
   }
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
@@ -460,9 +372,6 @@ export default function AdminPage() {
     setBlogExcerpt(blog.excerpt);
     setBlogCoverImage(blog.coverImage);
     setBlogContent(blog.content);
-    if (quillRef.current) {
-      quillRef.current.root.innerHTML = blog.content;
-    }
     setStatusMessage(`Editing "${blog.title}".`);
   }
 
@@ -823,16 +732,11 @@ export default function AdminPage() {
 
               <div className="admin-editor-wrap">
                 <span>Quill Blog Editor</span>
-                {quillFailed ? (
-                  <textarea
-                    value={blogContent}
-                    onChange={(event) => setBlogContent(event.target.value)}
-                    rows={12}
-                    placeholder="Quill CDN did not load. Write HTML/plain content here."
-                  />
-                ) : (
-                  <div id="blog-quill-editor" ref={editorContainerRef} className="blog-quill-editor" />
-                )}
+                <QuillEditor
+                  value={blogContent}
+                  onChange={setBlogContent}
+                  placeholder="Write the blog content here..."
+                />
               </div>
 
               <button type="submit" className="admin-primary-button" disabled={isSaving}>
